@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JG Flight Sim</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html,body{height:100%;margin:0}
+
+/* Layout: full-bleed 3D field; instrument strip top-left, mode and camera dock bottom, transmitter drawer slides over from the right. One dark world, no light theme. */
+:root{
+  --bg:#1B222B; --panel:#2A3440; --panel-2:#344050; --line:#44505F;
+  --fg:#F7F4EE; --muted:#A3AEBA; --accent:#F26522; --accent-ink:#1B222B;
+  --good:#5FD38D; --warn:#F5C542; --bad:#E8503A;
+  --display:'Rajdhani',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+#app{position:relative;width:100%;height:100%;overflow:hidden}
+#c{display:block;width:100%;height:100%}
+button{font:inherit;color:inherit}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-weight:600;font-size:15px;letter-spacing:.02em;cursor:pointer;min-height:40px}
+.btn:hover{background:var(--panel-2)}
+.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+.lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* HUD */
+#hud{position:absolute;top:0;left:0;padding:max(14px,env(safe-area-inset-top,0px)) 0 0 max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.inst{display:flex;gap:12px;align-items:flex-end}
+.gauge{background:rgba(27,34,43,.78);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:4px;padding:6px 12px 6px 10px;min-width:92px}
+.gauge .v{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums}
+.gauge .u{font-size:12px;color:var(--muted);margin-left:3px}
+.gauge.small .v{font-size:18px}
+.thr{display:flex;flex-direction:column;gap:4px;background:rgba(27,34,43,.78);border:1px solid var(--line);border-radius:4px;padding:6px 10px;width:120px}
+.bar{height:8px;background:var(--panel-2);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .08s linear}
+#status{font-family:var(--mono);font-size:12px;color:var(--muted);background:rgba(27,34,43,.6);padding:4px 8px;border-radius:4px;width:max-content;max-width:70vw}
+#status b{color:var(--fg);font-weight:500}
+#gatebox{display:none;gap:10px;align-items:center;background:rgba(27,34,43,.78);border:1px solid var(--line);border-radius:4px;padding:6px 10px;width:max-content;font-family:var(--mono);font-size:14px}
+#gatebox .n{color:var(--accent);font-weight:500}
+
+/* Dock */
+#dock{position:absolute;right:0;bottom:0;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:0 max(16px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) 16px;max-width:60vw}
+
+/* Touch sticks */
+#sticks{position:absolute;inset:0;pointer-events:none;display:none}
+#sticks.show{display:block}
+.stick{position:absolute;bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 56px);width:128px;height:128px;border-radius:50%;border:1.5px solid rgba(247,244,238,.35);background:rgba(27,34,43,.35);pointer-events:auto;touch-action:none}
+.stick.l{left:max(20px,env(safe-area-inset-left,0px))}
+.stick.r{right:max(20px,env(safe-area-inset-right,0px))}
+.stick .nub{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--accent);opacity:.9}
+.stick .tag{position:absolute;top:-20px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+
+/* Overlay screens */
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(27,34,43,.72);backdrop-filter:blur(3px);padding:24px max(16px,env(safe-area-inset-left,0px)) 24px max(16px,env(safe-area-inset-right,0px))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px 24px;width:min(460px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.card h1{margin:0;font-size:34px;font-weight:700;letter-spacing:.01em;line-height:1;text-wrap:balance}
+.card h1 span{color:var(--accent)}
+.card p{margin:0;color:var(--muted);line-height:1.45;font-size:16px;max-width:60ch}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-family:var(--mono);font-size:13px}
+.kv b{font-weight:500;color:var(--fg)}
+.kv span{color:var(--muted)}
+.ok{color:var(--good)}.no{color:var(--warn)}
+#crashTitle{color:var(--bad)}
+
+/* Drawer */
+#drawer{position:absolute;top:0;right:0;bottom:0;width:min(380px,100%);background:var(--panel);border-left:1px solid var(--line);padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) 16px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;box-shadow:-20px 0 50px rgba(0,0,0,.4)}
+#drawer h2{margin:0;font-size:22px;font-weight:700}
+.sec{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.ch{display:grid;grid-template-columns:70px 1fr auto auto;gap:8px;align-items:center;font-family:var(--mono);font-size:13px}
+.ch .bar{height:10px}
+.ch .bar i{transition:none}
+.ch .ax{color:var(--muted);font-size:12px}
+.mini{padding:4px 10px;min-height:32px;font-size:13px}
+.axes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;font-family:var(--mono);font-size:12px}
+.axes div{display:grid;grid-template-columns:26px 1fr;gap:6px;align-items:center;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.sl{display:grid;grid-template-columns:90px 1fr 48px;gap:10px;align-items:center;font-family:var(--mono);font-size:13px}
+.sl output{text-align:right;color:var(--muted)}
+.toggle{display:flex;gap:8px;align-items:center;font-size:15px}
+.hint{font-size:13px;color:var(--muted);line-height:1.4}
+kbd{font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+@media (max-width:520px){
+  .gauge .v{font-size:20px}.gauge{min-width:72px}.thr{width:96px}
+  #dock{max-width:100%;gap:6px}.btn{padding:7px 10px;font-size:14px}
+  #hud{gap:6px}
+}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="c"></canvas>
+
+  <div id="hud" aria-live="off">
+    <div class="inst">
+      <div class="gauge"><div class="lbl">Airspeed</div><div><span class="v" id="hAir">0</span><span class="u">km/h</span></div></div>
+      <div class="gauge"><div class="lbl">Altitude</div><div><span class="v" id="hAlt">0.0</span><span class="u">m</span></div></div>
+      <div class="gauge small"><div class="lbl">Heading</div><div><span class="v" id="hHdg">000</span><span class="u">°</span></div></div>
+      <div class="thr"><div class="lbl">Throttle <span id="hThrV" style="float:right;font-family:var(--mono);color:var(--fg)">0%</span></div><div class="bar"><i id="hThr"></i></div><div class="lbl" style="margin-top:2px">Flight <span id="hTime" style="font-family:var(--mono);color:var(--fg)">0:00</span></div></div>
+    </div>
+    <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
+    <div id="status"><b>CraycleCub V2</b> · Kurianad Field · <span id="sInput">keyboard</span></div>
+  </div>
+
+  <div id="dock">
+    <button class="btn" id="bMode">Mode: Freefly</button>
+    <button class="btn" id="bCam">Cam: Pilot</button>
+    <button class="btn" id="bSound">Sound: off</button>
+    <button class="btn" id="bReset">Reset</button>
+    <button class="btn" id="bTx">Transmitter</button>
+  </div>
+
+  <div id="sticks">
+    <div class="stick l" id="stL"><div class="tag">Throttle · Rudder</div><div class="nub"></div></div>
+    <div class="stick r" id="stR"><div class="tag">Elevator · Aileron</div><div class="nub"></div></div>
+  </div>
+
+  <div id="overlay">
+    <div class="card" id="startCard">
+      <h1>JG <span>Flight Sim</span></h1>
+      <p>CraycleCub V2 on the Kurianad field. 800 mm wingspan, 620 g, 2205 motor on 3S. Stall speed is around 27 km/h, so keep the throttle up until you are climbing.</p>
+      <div class="kv">
+        <b>Transmitter</b><span id="txState" class="no">not detected. Plug in the sim cable and move a stick.</span>
+        <b>Keyboard</b><span><kbd>←</kbd><kbd>→</kbd> ailerons · <kbd>↑</kbd> nose down · <kbd>↓</kbd> nose up · <kbd>A</kbd><kbd>D</kbd> rudder · <kbd>W</kbd><kbd>S</kbd> throttle · <kbd>R</kbd> reset · <kbd>C</kbd> camera</span>
+        <b>Phone</b><span>touch sticks, Mode 2 (throttle on the left)</span>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="bFly">Fly</button>
+        <button class="btn" id="bSetup">Set up transmitter</button>
+        <button class="btn" id="bTouch">Touch sticks</button>
+      </div>
+    </div>
+    <div class="card" id="crashCard" hidden>
+      <h1 id="crashTitle">Crashed</h1>
+      <p id="crashWhy">Hit the ground too hard.</p>
+      <div class="kv"><b>Flight time</b><span id="crashTime">0:00</span><b>Top speed</b><span id="crashSpd">0 km/h</span><b>Max altitude</b><span id="crashAlt">0 m</span></div>
+      <div class="row"><button class="btn primary" id="bAgain">Back on the runway</button></div>
+    </div>
+    <div class="card" id="winCard" hidden>
+      <h1>Course <span>complete</span></h1>
+      <p id="winWhy">All gates cleared.</p>
+      <div class="kv"><b>Time</b><span id="winTime">0.00s</span><b>Best</b><span id="winBest">0.00s</span></div>
+      <div class="row"><button class="btn primary" id="bWinAgain">Run it again</button><button class="btn" id="bWinFree">Freefly</button></div>
+    </div>
+  </div>
+
+  <div id="drawer" hidden>
+    <div class="row" style="justify-content:space-between"><h2>Transmitter</h2><button class="btn mini" id="bClose">Close</button></div>
+    <div class="hint" id="padName">No gamepad detected. On a Mac the FlySky sim cable shows up as a USB joystick once you move a stick.</div>
+    <div class="axes" id="axes"></div>
+    <div class="sec">
+      <div class="lbl">Channels. Tap Assign, then move only that stick fully.</div>
+      <div class="ch" id="ch-ail"></div>
+      <div class="ch" id="ch-ele"></div>
+      <div class="ch" id="ch-thr"></div>
+      <div class="ch" id="ch-rud"></div>
+    </div>
+    <div class="sec">
+      <div class="lbl">Feel</div>
+      <div class="sl"><span>Rates</span><input type="range" id="sRates" min="40" max="140" value="100"><output id="oRates">100%</output></div>
+      <div class="sl"><span>Expo</span><input type="range" id="sExpo" min="0" max="80" value="30"><output id="oExpo">30%</output></div>
+      <div class="sl"><span>Wind</span><input type="range" id="sWind" min="0" max="8" value="2"><output id="oWind">2 m/s</output></div>
+      <label class="toggle"><input type="checkbox" id="cSticks"> Show touch sticks</label>
+      <label class="toggle"><input type="checkbox" id="cShadow" checked> Shadows</label>
+    </div>
+    <div class="hint">Mapping, rates and expo are saved in this browser. Throttle reads the full stick travel, so push it fully down before taxiing.</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+if(!window.THREE){document.getElementById('startCard').innerHTML='<h1>3D library did not load</h1><p>Check the connection and reload.</p>';return;}
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- aircraft: CraycleCub V2 (800 mm, 620 g) ---------- */
+const AC={
+  mass:0.62, S:0.152, chord:0.19, span:0.8, rho:1.18, g:9.81,
+  Tmax:7.0, Vprop:24,
+  CL0:0.28, CLa:4.8, aStall:0.27, CD0:0.04, kInd:0.065,
+  Cm_de:0.25, Cm_a:-1.0, Cm_q:-22,
+  Cl_da:0.045, Cl_p:-0.5, Cl_b:0.09,
+  Cn_dr:0.06, Cn_b:0.10, Cn_r:-0.16,
+  Ixx:0.0065, Iyy:0.013, Izz:0.012, gear:0.09
+};
+
+/* ---------- state ---------- */
+const S={
+  pos:new THREE.Vector3(0,AC.gear,0), vel:new THREE.Vector3(), q:new THREE.Quaternion(), w:new THREE.Vector3(),
+  thr:0, onGround:true, crashed:false, flying:false, time:0, maxV:0, maxAlt:0, propAngle:0,
+  mode:'free', cam:'pilot', sound:false, started:false
+};
+const IN={ail:0,ele:0,rud:0,thr:0,src:'keyboard'};
+const settings=Object.assign({rates:100,expo:30,wind:2,sticks:false,shadow:true},store.get('jgsim.settings',{}));
+
+/* ---------- scene ---------- */
+const canvas=$('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+renderer.shadowMap.enabled=settings.shadow; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0xC9D7E3);
+scene.fog=new THREE.Fog(0xC9D7E3,180,900);
+const camera=new THREE.PerspectiveCamera(50,1,0.1,2000);
+
+const hemi=new THREE.HemisphereLight(0xdfe9f3,0x4a5a3a,0.75); scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff1dc,1.15); sun.position.set(-60,90,-40); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-60; sun.shadow.camera.right=60; sun.shadow.camera.top=60; sun.shadow.camera.bottom=-60; sun.shadow.camera.far=300; sun.shadow.bias=-0.0008;
+scene.add(sun); scene.add(sun.target);
+
+// ground: procedural grass
+function grassTex(){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#5f7f3d';g.fillRect(0,0,256,256);for(let i=0;i<3200;i++){g.fillStyle=`hsl(${86+Math.random()*22},${40+Math.random()*25}%,${28+Math.random()*18}%)`;g.fillRect(Math.random()*256,Math.random()*256,2,2+Math.random()*4);}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(220,220);t.anisotropy=4;t.encoding=THREE.sRGBEncoding;return t;}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),new THREE.MeshLambertMaterial({map:grassTex()}));
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+// runway strip (mud and gravel, like the real field)
+const runway=new THREE.Mesh(new THREE.PlaneGeometry(6,70),new THREE.MeshLambertMaterial({color:0x8a7a5e}));
+runway.rotation.x=-Math.PI/2; runway.position.set(0,0.01,-20); runway.receiveShadow=true; scene.add(runway);
+for(let i=0;i<7;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(0.4,3),new THREE.MeshLambertMaterial({color:0xF7F4EE}));m.rotation.x=-Math.PI/2;m.position.set(0,0.02,-50+i*10);scene.add(m);}
+
+// trees, hangar, fence
+const trees=[];
+const trunkM=new THREE.MeshLambertMaterial({color:0x5a3f28}), leafM=new THREE.MeshLambertMaterial({color:0x2f6b3a}), leafM2=new THREE.MeshLambertMaterial({color:0x3f7f3f});
+function tree(x,z,h){const g=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.4,h*0.45,7),trunkM);t.position.y=h*0.22;g.add(t);const c=new THREE.Mesh(new THREE.ConeGeometry(h*0.35,h*0.7,8),Math.random()<0.5?leafM:leafM2);c.position.y=h*0.45+h*0.35;g.add(c);g.position.set(x,0,z);g.traverse(o=>{o.castShadow=true;o.receiveShadow=true});scene.add(g);trees.push({x,z,r:h*0.35,h});}
+let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+for(let i=0;i<70;i++){const a=rnd()*Math.PI*2,d=60+rnd()*160;const x=Math.cos(a)*d,z=Math.sin(a)*d;if(Math.abs(x)<10&&z>-70&&z<30)continue;tree(x,z,5+rnd()*7);}
+for(let i=0;i<14;i++)tree(-26+rnd()*4,-70+i*9,4+rnd()*4);
+const hangar=new THREE.Mesh(new THREE.BoxGeometry(10,4,8),new THREE.MeshLambertMaterial({color:0x2A3440}));hangar.position.set(16,2,8);hangar.castShadow=hangar.receiveShadow=true;scene.add(hangar);
+const roof=new THREE.Mesh(new THREE.BoxGeometry(10.6,0.3,8.6),new THREE.MeshLambertMaterial({color:0xF26522}));roof.position.set(16,4.1,8);roof.castShadow=true;scene.add(roof);
+// pilot marker
+const pilot=new THREE.Group();pilot.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.4,8),new THREE.MeshLambertMaterial({color:0x2A3440})),{position:new THREE.Vector3(0,0.7,0)}));pilot.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),new THREE.MeshLambertMaterial({color:0xd9a77a})),{position:new THREE.Vector3(0,1.55,0)}));pilot.position.set(2.5,0,4);pilot.traverse(o=>o.castShadow=true);scene.add(pilot);
+const PILOT_EYE=new THREE.Vector3(2.5,1.65,4);
+
+/* ---------- plane mesh (JG colour plan: black airframe, white nose/tail/tips) ---------- */
+const black=new THREE.MeshLambertMaterial({color:0x1d2126}), white=new THREE.MeshLambertMaterial({color:0xF7F4EE}), ice=new THREE.MeshLambertMaterial({color:0x9ccfe8}), orange=new THREE.MeshLambertMaterial({color:0xF26522});
+const plane=new THREE.Group();
+function box(w,h,d,m,x,y,z){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.castShadow=true;plane.add(b);return b;}
+box(0.075,0.085,0.46,black,0,0,0.02);            // fuselage
+box(0.08,0.09,0.12,white,0,0,-0.26);             // nose
+box(0.06,0.05,0.12,ice,0,0.065,-0.08);           // canopy
+box(0.62,0.014,0.19,black,0,0.045,-0.04);        // wing centre
+box(0.09,0.015,0.19,white,-0.355,0.045,-0.04);   // tip L
+box(0.09,0.015,0.19,white,0.355,0.045,-0.04);    // tip R
+const ailL=box(0.2,0.01,0.05,orange,-0.25,0.045,0.065), ailR=box(0.2,0.01,0.05,orange,0.25,0.045,0.065);
+box(0.3,0.008,0.085,white,0,0.01,0.26);          // stab
+const elev=box(0.3,0.008,0.045,orange,0,0.01,0.325);
+box(0.008,0.13,0.1,white,0,0.07,0.26);           // fin
+const rudd=box(0.008,0.1,0.04,orange,0,0.07,0.33);
+const prop=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.004,24),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0.35}));prop.rotation.x=Math.PI/2;prop.position.set(0,0,-0.325);plane.add(prop);
+const propBlade=new THREE.Mesh(new THREE.BoxGeometry(0.15,0.012,0.004),black);propBlade.position.set(0,0,-0.325);plane.add(propBlade);
+[[-0.12,-0.045,-0.1],[0.12,-0.045,-0.1],[0,-0.045,0.24]].forEach(p=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,0.07,5),black);l.position.set(p[0],p[1],p[2]);plane.add(l);const wh=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.012,10),black);wh.rotation.z=Math.PI/2;wh.position.set(p[0],p[1]-0.045,p[2]);plane.add(wh);});
+scene.add(plane);
+
+/* ---------- gates ---------- */
+const GATES=[[0,8,-110,0],[60,12,-130,Math.PI/2],[90,10,-60,Math.PI*0.75],[50,14,10,Math.PI],[-50,9,20,Math.PI*1.3],[-80,12,-70,Math.PI*1.6]];
+const gateMeshes=[],gateObjs=[];
+const gateM=new THREE.MeshLambertMaterial({color:0xF26522}), gateDim=new THREE.MeshLambertMaterial({color:0x7a5a4a}), gateDone=new THREE.MeshLambertMaterial({color:0x5FD38D});
+GATES.forEach((g,i)=>{const grp=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(3,0.14,10,36),gateDim);ring.castShadow=true;grp.add(ring);const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,g[1]-3,6),black);pole.position.y=-(g[1]-3)/2-3;grp.add(pole);grp.position.set(g[0],g[1],g[2]);grp.rotation.y=g[3];grp.visible=false;scene.add(grp);gateMeshes.push(ring);const n=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),g[3]);gateObjs.push({pos:new THREE.Vector3(g[0],g[1],g[2]),n,grp});});
+const gate={i:0,t0:0,running:false,lastD:0,best:store.get('jgsim.best',null)};
+
+/* ---------- input: gamepad ---------- */
+const map=Object.assign({ail:{axis:0,inv:false},ele:{axis:1,inv:false},thr:{axis:2,inv:false},rud:{axis:3,inv:false}},store.get('jgsim.map',{}));
+let pad=null,padAxes=[],assigning=null,assignBase=null,assignT=0;
+function pollPad(){const gps=navigator.getGamepads?navigator.getGamepads():[];pad=null;for(const g of gps){if(g&&g.connected){pad=g;break;}}if(!pad)return false;padAxes=Array.from(pad.axes);return true;}
+window.addEventListener('gamepadconnected',()=>{pollPad();showPad();});
+function showPad(){const el=$('txState');if(pad){el.textContent=pad.id.slice(0,48)+' detected';el.className='ok';}else{el.textContent='not detected. Plug in the sim cable and move a stick.';el.className='no';}}
+function axisVal(ch){const m=map[ch];if(!pad||m.axis>=padAxes.length)return null;let v=clamp(padAxes[m.axis],-1,1);if(m.inv)v=-v;return v;}
+function expo(v,e){return v*(1-e)+v*v*v*e;}
+
+/* ---------- input: keyboard ---------- */
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR'){reset();}if(e.code==='KeyC'){cycleCam();}if(e.code==='Space'&&!S.started){startFlight();}if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
+window.addEventListener('keyup',e=>{keys[e.code]=false;});
+let kThr=0;
+
+/* ---------- input: touch sticks ---------- */
+const touch={l:{x:0,y:-1,id:null},r:{x:0,y:0,id:null}};
+function bindStick(el,key,springY){const nub=el.querySelector('.nub');const st=touch[key];let cx,cy,R;function set(dx,dy){st.x=clamp(dx/R,-1,1);st.y=clamp(-dy/R,-1,1);nub.style.transform=`translate(${st.x*R*0.75}px,${-st.y*R*0.75}px)`;}
+el.addEventListener('pointerdown',e=>{const r=el.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;R=r.width/2;st.id=e.pointerId;el.setPointerCapture(e.pointerId);set(e.clientX-cx,e.clientY-cy);});
+el.addEventListener('pointermove',e=>{if(st.id!==e.pointerId)return;set(e.clientX-cx,e.clientY-cy);});
+const up=e=>{if(st.id!==e.pointerId)return;st.id=null;st.x=0;if(springY)st.y=0;nub.style.transform=`translate(0px,${-st.y*R*0.75}px)`;};
+el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);}
+bindStick($('stL'),'l',false);bindStick($('stR'),'r',true);
+$('stL').querySelector('.nub').style.transform='translate(0px,48px)';
+function setSticks(on){settings.sticks=on;$('sticks').classList.toggle('show',on);$('cSticks').checked=on;saveSettings();}
+
+function readInput(){
+  const ex=settings.expo/100, rt=settings.rates/100;
+  let a=0,e=0,r=0,t=null,src='keyboard';
+  if(pollPad()){const va=axisVal('ail'),ve=axisVal('ele'),vr=axisVal('rud'),vt=axisVal('thr');if(va!==null)a=va;if(ve!==null)e=ve;if(vr!==null)r=vr;if(vt!==null)t=(-vt+1)/2;src='transmitter';}
+  const touching=touch.l.id!==null||touch.r.id!==null;
+  if(touching){a=touch.r.x;e=-touch.r.y;r=touch.l.x;t=(touch.l.y+1)/2;src='touch';}
+  else if(src==='keyboard'){
+    if(keys.ArrowLeft)a=-1;if(keys.ArrowRight)a=1;if(keys.ArrowDown)e=1;if(keys.ArrowUp)e=-1;if(keys.KeyA)r=-1;if(keys.KeyD)r=1;
+    if(keys.KeyW){kThr=clamp(kThr+0.02,0,1);touch.l.y=kThr*2-1;}if(keys.KeyS){kThr=clamp(kThr-0.02,0,1);touch.l.y=kThr*2-1;}
+    t=settings.sticks?(touch.l.y+1)/2:kThr;
+  }
+  if(t===null)t=kThr;
+  // dead band + expo + rates
+  const db=v=>Math.abs(v)<0.04?0:v;
+  IN.ail=expo(db(a),ex)*rt;IN.ele=expo(db(e),ex)*rt;IN.rud=expo(db(r),ex)*rt;IN.thr=clamp(t,0,1);IN.src=src;
+}
+
+/* ---------- physics ---------- */
+const tmp=new THREE.Vector3(),tmp2=new THREE.Vector3(),qi=new THREE.Quaternion(),dq=new THREE.Quaternion(),vb=new THREE.Vector3();
+const FWD=new THREE.Vector3(0,0,-1),UP=new THREE.Vector3(0,1,0),RIGHT=new THREE.Vector3(1,0,0);
+let windT=0;
+function windVec(t){const w=settings.wind;const gust=1+0.25*Math.sin(t*0.7)+0.15*Math.sin(t*2.3);return new THREE.Vector3(w*gust*0.9,0,w*gust*0.3);}
+function step(dt){
+  S.time+=dt;
+  // thrust lag: motor spools over ~0.25 s
+  S.thr=lerp(S.thr,IN.thr,1-Math.exp(-dt/0.25));
+  const wind=windVec(S.time);
+  const vRel=tmp.copy(S.vel).sub(wind);
+  qi.copy(S.q).invert();
+  vb.copy(vRel).applyQuaternion(qi);
+  const V=vRel.length();
+  const fwd=tmp2.copy(FWD).applyQuaternion(S.q);
+  const F=new THREE.Vector3(0,-AC.mass*AC.g,0);
+  // thrust, drops with airspeed through the prop
+  const thrust=S.thr*AC.Tmax*clamp(1-V/AC.Vprop,0.15,1);
+  F.addScaledVector(fwd,thrust);
+  let alpha=0,beta=0;
+  const tq=new THREE.Vector3();
+  if(V>0.5){
+    alpha=Math.atan2(-vb.y,-vb.z); beta=Math.atan2(vb.x,-vb.z);
+    if(vb.z>0){alpha=clamp(alpha,-0.5,0.5);} // moving backwards: tame it
+    const qd=0.5*AC.rho*V*V;
+    const aa=Math.abs(alpha);
+    let stall=1; if(aa>AC.aStall) stall=clamp(1-(aa-AC.aStall)/0.22,0.25,1);
+    const CL=(AC.CL0+AC.CLa*clamp(alpha,-0.6,0.6))*stall;
+    const CD=AC.CD0+AC.kInd*CL*CL+1.0*Math.sin(alpha)*Math.sin(alpha)+0.5*beta*beta;
+    const vhat=vRel.clone().normalize();
+    const up=UP.clone().applyQuaternion(S.q);
+    const liftDir=up.clone().sub(vhat.clone().multiplyScalar(up.dot(vhat))).normalize();
+    F.addScaledVector(liftDir,qd*AC.S*CL);
+    F.addScaledVector(vhat,-qd*AC.S*CD);
+    const right=RIGHT.clone().applyQuaternion(S.q);
+    F.addScaledVector(right,-qd*AC.S*0.35*beta);
+    // moments (local axes: x pitch, y yaw, z roll)
+    const c=AC.chord,b=AC.span;
+    const qhat=S.w.x*c/(2*V), phat=S.w.z*b/(2*V), rhat=S.w.y*b/(2*V);
+    const propwash=clamp(0.5+S.thr*0.6,0.5,1.1); // elevator and rudder get more authority in prop blast
+    tq.x=qd*AC.S*c*(AC.Cm_de*IN.ele*propwash + AC.Cm_a*alpha + AC.Cm_q*qhat);
+    tq.z=qd*AC.S*b*(-AC.Cl_da*IN.ail + AC.Cl_p*phat + AC.Cl_b*beta);
+    tq.y=qd*AC.S*b*(-AC.Cn_dr*IN.rud*propwash - AC.Cn_b*beta + AC.Cn_r*rhat);
+  } else {
+    // very slow: prop blast still gives elevator and rudder a little authority
+    tq.x=0.15*IN.ele*S.thr; tq.y=-0.05*IN.rud*S.thr;
+  }
+  // angular damping when nearly stationary
+  tq.addScaledVector(S.w,-0.002);
+  S.w.x+=tq.x/AC.Ixx*dt; S.w.y+=tq.y/AC.Iyy*dt; S.w.z+=tq.z/AC.Izz*dt;
+  S.w.clampLength(0,14);
+  const acc=F.multiplyScalar(1/AC.mass);
+  S.vel.addScaledVector(acc,dt);
+  S.pos.addScaledVector(S.vel,dt);
+  // orientation
+  const ang=S.w.length()*dt;
+  if(ang>0){dq.setFromAxisAngle(tmp.copy(S.w).normalize(),ang);S.q.multiply(dq).normalize();}
+  // ground contact
+  const up=UP.clone().applyQuaternion(S.q);
+  const roll=Math.atan2(RIGHT.clone().applyQuaternion(S.q).y,up.y);
+  const pitch=Math.asin(clamp(fwd.y,-1,1)); // nose up is positive
+  if(S.pos.y<=AC.gear){
+    const vy=S.vel.y;
+    const Vg=S.vel.length();
+    if(!S.onGround){ // touchdown
+      if(vy<-2.6) return crash('Hit the ground at '+Math.abs(vy).toFixed(1)+' m/s down. Flare more and come in slower.');
+      if(Math.abs(roll)>0.45) return crash('Touched down with a wing low. Level the wings before the flare.');
+      if(pitch<-0.45) return crash('Nosed in. Keep the nose up through the landing.');
+      if(Vg>17) return crash('Too fast on touchdown. Cut the throttle earlier.');
+    }
+    S.onGround=true; S.pos.y=AC.gear; if(S.vel.y<0)S.vel.y=0;
+    // rolling resistance and steering
+    const spd=S.vel.length(); if(spd>0){const dec=Math.min(spd,1.0*dt);S.vel.addScaledVector(S.vel.clone().normalize(),-dec);}
+    // wheels on the ground: wings level, nose can only rotate up (tail sits on the strip)
+    S.w.z*=0.2;
+    const yaw=Math.atan2(-fwd.x,-fwd.z);
+    const level=new THREE.Quaternion().setFromEuler(new THREE.Euler(clamp(pitch,0,0.35),yaw,0,'YXZ'));
+    S.q.slerp(level,clamp(dt*10,0,1));
+    if(pitch<=0&&S.w.x<0)S.w.x=0;
+    S.w.y=-IN.rud*clamp(spd*0.35,0,2.2);
+    // velocity follows the nose on the ground
+    const f2=FWD.clone().applyQuaternion(S.q);
+    const along=S.vel.dot(f2);
+    S.vel.lerp(f2.multiplyScalar(along),clamp(dt*6,0,1));
+    if(Math.abs(S.pos.x)>3.5||S.pos.z>18||S.pos.z<-62){ // off the strip: grass is rough
+      if(spd>9) return crash('Ran off the strip into the grass at speed.');
+      S.vel.multiplyScalar(1-dt*1.5);
+    }
+  } else {
+    S.onGround=false;
+    if(S.pos.y>AC.gear+0.5) S.flying=true;
+  }
+  // trees and hangar
+  for(const t of trees){const dx=S.pos.x-t.x,dz=S.pos.z-t.z;if(S.pos.y<t.h&&dx*dx+dz*dz<(t.r*0.8)*(t.r*0.8))return crash('Flew into a tree.');}
+  if(Math.abs(S.pos.x-16)<5.3&&Math.abs(S.pos.z-8)<4.3&&S.pos.y<4.5)return crash('Flew into the hangar.');
+  if(S.pos.y>600||Math.abs(S.pos.x)>900||Math.abs(S.pos.z)>900)return crash('Flew out of the field. Keep it where you can see it.');
+  S.maxV=Math.max(S.maxV,V); S.maxAlt=Math.max(S.maxAlt,S.pos.y);
+  // gates
+  if(S.mode==='gates') checkGate();
+  S.propAngle+=(S.thr*180+V*4)*dt;
+}
+
+function checkGate(){
+  const g=gateObjs[gate.i]; if(!g) return;
+  const rel=tmp.copy(S.pos).sub(g.pos);
+  const d=rel.dot(g.n);
+  const lateral=rel.clone().addScaledVector(g.n,-d).length();
+  if(gate.lastD<0&&d>=0&&lateral<2.8||gate.lastD>0&&d<=0&&lateral<2.8){
+    if(!gate.running){gate.running=true;gate.t0=S.time;}
+    gateMeshes[gate.i].material=gateDone; gate.i++;
+    if(gate.i<gateObjs.length){gateMeshes[gate.i].material=gateM;}
+    else{const t=S.time-gate.t0;gate.running=false;const best=gate.best===null||t<gate.best?t:gate.best;if(gate.best===null||t<gate.best){gate.best=t;store.set('jgsim.best',t);}showWin(t,best);}
+  }
+  gate.lastD=d;
+}
+
+function crash(why){S.crashed=true;S.vel.set(0,0,0);S.w.set(0,0,0);$('crashWhy').textContent=why;$('crashTime').textContent=fmtTime(S.time);$('crashSpd').textContent=Math.round(S.maxV*3.6)+' km/h';$('crashAlt').textContent=S.maxAlt.toFixed(1)+' m';show('crashCard');if(audio)audio.gain.gain.setTargetAtTime(0,audio.ctx.currentTime,0.05);return true;}
+
+function reset(){
+  S.pos.set(0,AC.gear,0);S.vel.set(0,0,0);S.w.set(0,0,0);S.q.identity();S.thr=0;kThr=0;touch.l.y=-1;
+  S.onGround=true;S.crashed=false;S.flying=false;S.time=0;S.maxV=0;S.maxAlt=0;
+  gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
+  gateObjs.forEach(g=>g.grp.visible=S.mode==='gates');$('gatebox').style.display=S.mode==='gates'?'flex':'none';
+  camPos.copy(new THREE.Vector3(0,1.2,3));
+  if(S.started)hide();else show('startCard');
+}
+function show(id){$('overlay').hidden=false;['startCard','crashCard','winCard'].forEach(c=>$(c).hidden=c!==id);}
+function hide(){$('overlay').hidden=true;}
+function showWin(t,best){$('winTime').textContent=t.toFixed(2)+'s';$('winBest').textContent=best.toFixed(2)+'s';show('winCard');}
+function fmtTime(s){s=Math.floor(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+/* ---------- camera ---------- */
+const camPos=new THREE.Vector3(0,1.2,3),camLook=new THREE.Vector3();
+function cycleCam(){S.cam=S.cam==='pilot'?'chase':S.cam==='chase'?'fpv':'pilot';$('bCam').textContent='Cam: '+(S.cam==='pilot'?'Pilot':S.cam==='chase'?'Chase':'FPV');}
+function updateCamera(dt){
+  if(S.cam==='pilot'){
+    camera.position.copy(PILOT_EYE);
+    camLook.lerp(S.pos,1-Math.exp(-dt*12));
+    camera.lookAt(camLook);
+    const d=PILOT_EYE.distanceTo(S.pos);
+    camera.fov=clamp(42*12/Math.max(d,12),9,42); camera.updateProjectionMatrix();
+  } else if(S.cam==='chase'){
+    const target=new THREE.Vector3(0,0.55,2.4).applyQuaternion(S.q).add(S.pos);
+    camPos.lerp(target,1-Math.exp(-dt*5));
+    camera.position.copy(camPos);
+    camera.lookAt(S.pos.clone().addScaledVector(FWD.clone().applyQuaternion(S.q),2));
+    camera.fov=55;camera.updateProjectionMatrix();
+  } else {
+    camera.position.copy(new THREE.Vector3(0,0.09,-0.2).applyQuaternion(S.q).add(S.pos));
+    camera.quaternion.copy(S.q);
+    camera.fov=80;camera.updateProjectionMatrix();
+  }
+}
+
+/* ---------- sound ---------- */
+let audio=null;
+function initAudio(){try{const ctx=new (window.AudioContext||window.webkitAudioContext)();const o1=ctx.createOscillator(),o2=ctx.createOscillator(),g=ctx.createGain();o1.type='sawtooth';o2.type='square';o2.detune.value=7;const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;o1.connect(f);o2.connect(f);f.connect(g);g.connect(ctx.destination);g.gain.value=0;o1.start();o2.start();audio={ctx,o1,o2,gain:g};}catch(e){audio=null;}}
+function updateAudio(){if(!audio)return;const f=60+S.thr*260+S.vel.length()*2;audio.o1.frequency.setTargetAtTime(f,audio.ctx.currentTime,0.05);audio.o2.frequency.setTargetAtTime(f*0.5,audio.ctx.currentTime,0.05);audio.gain.gain.setTargetAtTime(S.sound&&!S.crashed?0.03+S.thr*0.09:0,audio.ctx.currentTime,0.05);}
+
+/* ---------- HUD ---------- */
+function updateHUD(){
+  $('hAir').textContent=Math.round(S.vel.length()*3.6);
+  $('hAlt').textContent=Math.max(0,S.pos.y-AC.gear).toFixed(1);
+  const f=FWD.clone().applyQuaternion(S.q);let hdg=Math.round((Math.atan2(f.x,-f.z)*180/Math.PI+360)%360);$('hHdg').textContent=String(hdg).padStart(3,'0');
+  $('hThr').style.width=Math.round(S.thr*100)+'%';$('hThrV').textContent=Math.round(IN.thr*100)+'%';
+  $('hTime').textContent=fmtTime(S.time);
+  $('sInput').textContent=IN.src;
+  if(S.mode==='gates'){$('gNum').textContent=Math.min(gate.i+1,gateObjs.length);$('gTot').textContent=gateObjs.length;$('gTime').textContent=(gate.running?(S.time-gate.t0):0).toFixed(2)+'s';$('gBest').textContent=gate.best!==null?'best '+gate.best.toFixed(2)+'s':'';}
+}
+
+/* ---------- drawer: mapping ---------- */
+const CH=[['ail','Aileron'],['ele','Elevator'],['thr','Throttle'],['rud','Rudder']];
+function buildDrawer(){
+  CH.forEach(([k,name])=>{const el=$('ch-'+k);el.innerHTML=`<span>${name}</span><div class="bar"><i id="bar-${k}"></i></div><button class="btn mini" data-assign="${k}">Assign</button><button class="btn mini" data-inv="${k}">Inv</button>`;});
+  $('drawer').addEventListener('click',e=>{const a=e.target.closest('[data-assign]'),i=e.target.closest('[data-inv]');if(a){startAssign(a.dataset.assign,a);}if(i){map[i.dataset.inv].inv=!map[i.dataset.inv].inv;store.set('jgsim.map',map);refreshInv();}});
+  refreshInv();
+}
+function refreshInv(){CH.forEach(([k])=>{const b=$('drawer').querySelector(`[data-inv="${k}"]`);b.classList.toggle('on',!!map[k].inv);const a=$('drawer').querySelector(`[data-assign="${k}"]`);a.textContent='Axis '+map[k].axis;});}
+function startAssign(k,btn){if(!pollPad()){$('padName').textContent='No gamepad detected yet. Move a stick on the transmitter, then try again.';return;}assigning=k;assignBase=padAxes.slice();assignT=performance.now();btn.textContent='Move it…';}
+function updateDrawer(){
+  if($('drawer').hidden)return;
+  if(pollPad()){$('padName').textContent=pad.id.slice(0,60)+' · '+padAxes.length+' axes';}
+  const ax=$('axes');if(ax.childElementCount!==padAxes.length){ax.innerHTML=padAxes.map((v,i)=>`<div><span>${i}</span><div class="bar"><i id="ax${i}"></i></div></div>`).join('');}
+  padAxes.forEach((v,i)=>{const e=$('ax'+i);if(e){e.style.width=((v+1)/2*100).toFixed(0)+'%';}});
+  CH.forEach(([k])=>{const v=axisVal(k);const e=$('bar-'+k);if(e)e.style.width=v===null?'0%':(((v+1)/2)*100).toFixed(0)+'%';});
+  if(assigning&&assignBase){let best=-1,bd=0.45;padAxes.forEach((v,i)=>{const d=Math.abs(v-assignBase[i]);if(d>bd){bd=d;best=i;}});if(best>=0){map[assigning].axis=best;store.set('jgsim.map',map);assigning=null;refreshInv();}else if(performance.now()-assignT>5000){assigning=null;refreshInv();}}
+}
+
+/* ---------- UI wiring ---------- */
+function startFlight(){S.started=true;hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();}
+$('bFly').addEventListener('click',startFlight);
+$('bSetup').addEventListener('click',()=>{startFlight();$('drawer').hidden=false;});
+$('bTouch').addEventListener('click',()=>{setSticks(true);startFlight();});
+$('bAgain').addEventListener('click',reset);
+$('bWinAgain').addEventListener('click',reset);
+$('bWinFree').addEventListener('click',()=>{S.mode='free';$('bMode').textContent='Mode: Freefly';reset();});
+$('bReset').addEventListener('click',reset);
+$('bCam').addEventListener('click',cycleCam);
+$('bMode').addEventListener('click',()=>{S.mode=S.mode==='free'?'gates':'free';$('bMode').textContent=S.mode==='free'?'Mode: Freefly':'Mode: Gates';reset();});
+$('bSound').addEventListener('click',()=>{if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();S.sound=!S.sound;$('bSound').textContent='Sound: '+(S.sound?'on':'off');});
+$('bTx').addEventListener('click',()=>{$('drawer').hidden=false;});
+$('bClose').addEventListener('click',()=>{$('drawer').hidden=true;});
+function saveSettings(){store.set('jgsim.settings',settings);}
+$('sRates').value=settings.rates;$('oRates').textContent=settings.rates+'%';
+$('sExpo').value=settings.expo;$('oExpo').textContent=settings.expo+'%';
+$('sWind').value=settings.wind;$('oWind').textContent=settings.wind+' m/s';
+$('cShadow').checked=settings.shadow;
+$('sRates').addEventListener('input',e=>{settings.rates=+e.target.value;$('oRates').textContent=settings.rates+'%';saveSettings();});
+$('sExpo').addEventListener('input',e=>{settings.expo=+e.target.value;$('oExpo').textContent=settings.expo+'%';saveSettings();});
+$('sWind').addEventListener('input',e=>{settings.wind=+e.target.value;$('oWind').textContent=settings.wind+' m/s';saveSettings();});
+$('cSticks').addEventListener('change',e=>setSticks(e.target.checked));
+$('cShadow').addEventListener('change',e=>{settings.shadow=e.target.checked;renderer.shadowMap.enabled=settings.shadow;scene.traverse(o=>{if(o.material)o.material.needsUpdate=true;});saveSettings();});
+buildDrawer();
+const coarse=matchMedia('(pointer:coarse)').matches&&!matchMedia('(min-width:900px)').matches;
+if(settings.sticks||coarse)setSticks(true);
+$('cSticks').checked=settings.sticks;
+window.addEventListener('gamepaddisconnected',()=>{pad=null;padShown=false;showPad();});
+
+/* ---------- loop ---------- */
+function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}}
+let last=performance.now(),acc=0;const DT=1/120;
+function frame(now){
+  requestAnimationFrame(frame);
+  resize();
+  let dt=Math.min((now-last)/1000,0.05);last=now;
+  readInput();
+  if(!pad)showPadOnce();
+  if(S.started&&!S.crashed&&$('overlay').hidden){acc+=dt;let n=0;while(acc>=DT&&n<6){if(step(DT))break;acc-=DT;n++;}}
+  // visual
+  plane.position.copy(S.pos);plane.quaternion.copy(S.q);
+  propBlade.rotation.z=S.propAngle;prop.material.opacity=clamp(S.thr*0.5,0,0.4);
+  ailL.rotation.x=-IN.ail*0.5;ailR.rotation.x=IN.ail*0.5;elev.rotation.x=-IN.ele*0.5;rudd.rotation.y=IN.rud*0.5;
+  sun.target.position.copy(S.pos);sun.position.copy(S.pos).add(new THREE.Vector3(-60,90,-40));
+  updateCamera(dt);updateHUD();updateAudio();updateDrawer();
+  renderer.render(scene,camera);
+}
+let padShown=false;function showPadOnce(){if(!padShown&&pollPad()){padShown=true;showPad();}}
+reset();show('startCard');showPad();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>

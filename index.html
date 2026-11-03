@@ -102,11 +102,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px 
 #drawer{position:absolute;top:0;right:0;bottom:0;width:min(400px,100%);background:var(--panel);border-left:1px solid var(--line);padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) 16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;box-shadow:-20px 0 50px rgba(0,0,0,.4)}
 #drawer h2{margin:0;font-size:22px;font-weight:700}
 .sec{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
-.ch{display:grid;grid-template-columns:66px 1fr auto auto auto;gap:6px;align-items:center;font-family:var(--mono);font-size:13px}
-.ch .bar{height:10px;position:relative}
-.ch .bar:after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-2)}
-.ch .trim{display:flex;gap:2px;align-items:center}
-.ch .trim b{min-width:34px;text-align:center;font-weight:500;font-size:12px}
 .axes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;font-family:var(--mono);font-size:12px}
 .axes>div{display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:center;color:var(--muted)}
 input[type=range]{width:100%;accent-color:var(--accent)}
@@ -119,7 +114,35 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 @media (prefers-reduced-motion:reduce){#flash{display:none}}
 #wiz{background:var(--panel-2);border:1px solid var(--accent);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 #wiz b{font-size:17px}
+/* v0.4 additions */
+#overlay.side{justify-content:flex-end;background:transparent;backdrop-filter:none;pointer-events:none}
+#overlay.side .card{pointer-events:auto;width:min(560px,100%);max-height:calc(100% - 48px);overflow-y:auto;background:rgba(36,45,56,.96)}
+#hud.minimal .inst,#hud.minimal #status{display:none}
+#hud.hidden{display:none}
+body.hangar #hud,body.hangar #dock,body.hangar #marshal{display:none}
+.sheet{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-family:var(--mono);font-size:13px}
+.sheet span{color:var(--muted)}.sheet b{font-weight:500}
+.fntable{display:flex;flex-direction:column;gap:6px}
+.fntable.dim{opacity:.5}
+.fnrow{display:grid;grid-template-columns:150px 1fr auto auto auto;gap:6px;align-items:center;font-family:var(--mono);font-size:13px}
+.fnrow.off{opacity:.45}
+.fnrow .fnname{display:flex;flex-direction:column;line-height:1.15}.fnrow .fnname small{font-size:10.5px;color:var(--muted);font-family:var(--display)}
+.fnrow .bar{height:10px;position:relative}.fnrow .bar:after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-2)}
+.raw{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 12px;font-family:var(--mono);font-size:11.5px}
+.raw>div{display:grid;grid-template-columns:26px 1fr 40px;gap:6px;align-items:center;color:var(--muted)}
+.raw b{font-weight:400;text-align:right}
+#wiz{background:var(--panel-2);border:1px solid var(--accent);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+#wiz .lbl{color:var(--accent)}
+#wiz b{font-size:19px}
+.trimrow{display:grid;grid-template-columns:70px auto;gap:8px 14px;align-items:center;font-family:var(--mono);font-size:13px}
+.trimrow .trim{display:flex;gap:4px;align-items:center}.trimrow .trim b{min-width:34px;text-align:center;font-weight:500}
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.menu .btn{min-height:48px}
+.menu .btn.primary{grid-column:1/3}
 @media (max-width:620px){
+  .fnrow{grid-template-columns:110px 1fr auto auto auto;font-size:12px}
+  #overlay.side{justify-content:center}
+  .menu{grid-template-columns:1fr}.menu .btn.primary{grid-column:auto}
   .cell .v{font-size:18px}.cell{min-width:62px;padding:4px 7px 3px}.cell.small .v{font-size:14px}
   .inst canvas.gauge{width:84px;height:84px}
   .kvs{min-width:110px;font-size:11.5px}.kvs b.big{font-size:16px}
@@ -171,8 +194,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <div id="dock">
     <button class="btn" id="bMode">Freefly</button>
     <button class="btn" id="bCam">Cam: Pilot</button>
+    <button class="btn" id="bTele">Telemetry: full</button>
     <button class="btn" id="bSound">Sound off</button>
-    <button class="btn" id="bLog">Logbook</button>
     <button class="btn" id="bPause">Pause</button>
     <button class="btn" id="bTx">Transmitter</button>
   </div>
@@ -183,31 +206,57 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </div>
 
   <div id="overlay">
-    <div class="card" id="startCard">
+    <div class="card" id="menuCard">
       <h1>JG <span>Flight Sim</span></h1>
-      <p>CraycleCub V2 on the Kurianad strip. 800 mm span, 620 g, 2205 motor on a 3S 2200 mAh. Tail-dragger, so hold a little right rudder on the takeoff roll and let the tail come up on its own.</p>
+      <p>CraycleCub V2 on the Kurianad strip. The flight model, the field rules and the transmitter setup are built to train for the real maiden, not to look pretty.</p>
       <div class="kv">
-        <b>Transmitter</b><span id="txState" class="no">not detected. Plug in the sim cable and move a stick.</span>
-        <b>Keyboard</b><span><kbd>←</kbd><kbd>→</kbd> ailerons · <kbd>↑</kbd> push · <kbd>↓</kbd> pull · <kbd>A</kbd><kbd>D</kbd> rudder · <kbd>W</kbd><kbd>S</kbd> throttle · <kbd>L</kbd> rates · <kbd>P</kbd> pause · <kbd>R</kbd> reset · <kbd>C</kbd> camera</span>
-        <b>Phone</b><span>touch sticks, Mode 2</span>
+        <b>Transmitter</b><span id="txState" class="no">not detected. Plug in the sim cable, switch the TX on, move a stick.</span>
+        <b>Keyboard</b><span><kbd>←</kbd><kbd>→</kbd> ailerons · <kbd>↑</kbd> push · <kbd>↓</kbd> pull · <kbd>A</kbd><kbd>D</kbd> rudder · <kbd>W</kbd><kbd>S</kbd> throttle · <kbd>L</kbd> rates · <kbd>T</kbd> telemetry · <kbd>P</kbd> pause · <kbd>R</kbd> reset · <kbd>C</kbd> camera</span>
       </div>
-      <div class="row">
-        <button class="btn primary" id="bPreflight">Preflight</button>
-        <button class="btn" id="bSetup">Set up transmitter</button>
-        <button class="btn" id="bTouch">Touch sticks</button>
+      <div class="menu">
+        <button class="btn primary" id="bFly">Fly</button>
+        <button class="btn" id="bHangar">Hangar</button>
+        <button class="btn" id="bMenuTx">Transmitter setup</button>
+        <button class="btn" id="bMenuSettings">Field and feel</button>
+        <button class="btn" id="bMenuLog">Logbook</button>
+        <button class="btn" id="bTouch">Touch sticks (phone)</button>
+      </div>
+    </div>
+
+    <div class="card" id="hangarCard" hidden>
+      <h2>Hangar</h2>
+      <p>The aircraft the model is tuned to. Numbers in the sim come from these.</p>
+      <div class="sheet" id="sheet"></div>
+      <div class="row"><button class="btn primary" id="bHangarFly">Preflight and fly</button><button class="btn" id="bHangarBack">Back</button></div>
+    </div>
+
+    <div class="card" id="txCard" hidden>
+      <div class="row" style="justify-content:space-between"><h2>Transmitter setup</h2><button class="btn mini" id="bTxBack">Back</button></div>
+      <div><div class="lbl">Detected device</div><b id="txDevice" style="font-size:16px">No transmitter detected</b><div class="hint" id="txMeta"></div></div>
+      <div class="raw" id="txAxes"></div>
+      <div class="row" style="justify-content:space-between"><div class="lbl">Functions</div><button class="btn mini primary" id="bTxWizard">Run guided setup</button></div>
+      <div id="wiz" hidden><span class="lbl" id="wizStep"></span><b id="wizTitle"></b><span id="wizText" class="hint" style="color:var(--fg)"></span><div class="row" id="wizBtns"></div></div>
+      <div class="fntable" id="fnTable"></div>
+      <div class="hint" id="txHint">Everything here is live: the plane on the left mirrors your sticks. Assign: tap a button, then move the control you want for it. Rev flips it. The guided setup does all of this with a direction check for each stick.</div>
+      <div class="lbl">Trims</div>
+      <div class="trimrow" id="trims">
+        <span>Aileron</span><span class="trim"><button class="btn mini" data-trim="ail" data-d="-1">−</button><b id="trim-ail">0</b><button class="btn mini" data-trim="ail" data-d="1">+</button></span>
+        <span>Elevator</span><span class="trim"><button class="btn mini" data-trim="ele" data-d="-1">−</button><b id="trim-ele">0</b><button class="btn mini" data-trim="ele" data-d="1">+</button></span>
+        <span>Rudder</span><span class="trim"><button class="btn mini" data-trim="rud" data-d="-1">−</button><b id="trim-rud">0</b><button class="btn mini" data-trim="rud" data-d="1">+</button><button class="btn mini" id="bTrim0" style="margin-left:8px">Zero</button></span>
       </div>
     </div>
 
     <div class="card" id="preCard" hidden>
       <h2>Preflight</h2>
-      <p>Same checks as at the field. Items tick themselves as you do them.</p>
+      <p>Same checks as at the field. Items tick themselves as you do them. Watch the plane: every surface should move the way the real one would.</p>
       <div class="check">
+        <div class="ci" id="pf-tx"><span class="dot"></span><span>Transmitter mapped and verified</span><small id="pf-tx-v">keyboard</small></div>
         <div class="ci" id="pf-thr"><span class="dot"></span><span>Throttle stick fully down</span><small id="pf-thr-v">100%</small></div>
         <div class="ci done" id="pf-batt"><span class="dot"></span><span>Battery: 3S 2200 mAh</span><small>12.6 V</small></div>
-        <div class="ci" id="pf-ail"><span class="dot"></span><span>Aileron: full right, watch the surface</span><small>right wing aileron goes up</small></div>
-        <div class="ci" id="pf-ele"><span class="dot"></span><span>Elevator: full pull</span><small>elevator goes up</small></div>
+        <div class="ci" id="pf-ail"><span class="dot"></span><span>Aileron: full right</span><small>right aileron up, left down</small></div>
+        <div class="ci" id="pf-ele"><span class="dot"></span><span>Elevator: full pull</span><small>elevator trailing edge up</small></div>
         <div class="ci" id="pf-rud"><span class="dot"></span><span>Rudder: full right</span><small>rudder swings right</small></div>
-        <div class="ci" id="pf-wind"><span class="dot"></span><span>Wind and runway</span><small id="pf-wind-v">330° at 2 m/s, RWY 00</small></div>
+        <div class="ci" id="pf-wind" style="cursor:pointer"><span class="dot"></span><span>Wind and runway (tap to confirm)</span><small id="pf-wind-v">330° at 2 m/s, RWY 00</small></div>
       </div>
       <div class="row">
         <button class="btn primary" id="bClear">Clear prop. Fly</button>
@@ -218,7 +267,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
     <div class="card" id="crashCard" hidden>
       <h1 class="bad-t" id="crashTitle">Crashed</h1>
-      <p id="crashWhy">Hit the ground too hard.</p>
+      <p id="crashWhy"></p>
       <div class="stat"><div><span class="lbl">Flight</span><b id="crashTime">0:00</b></div><div><span class="lbl">Top speed</span><b id="crashSpd">0</b> <span class="lbl">km/h</span></div><div><span class="lbl">Max alt</span><b id="crashAlt">0</b> <span class="lbl">m</span></div></div>
       <div class="row"><button class="btn primary" id="bAgain">Back on the strip</button></div>
     </div>
@@ -240,7 +289,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <div class="card" id="pauseCard" hidden>
       <h2>Paused</h2>
       <p>Sim is frozen. The battery clock stops too.</p>
-      <div class="row"><button class="btn primary" id="bResume">Resume</button><button class="btn" id="bPauseTx">Transmitter</button><button class="btn" id="bPauseLog">Logbook</button><button class="btn" id="bPauseReset">Reset</button></div>
+      <div class="row"><button class="btn primary" id="bResume">Resume</button><button class="btn" id="bPauseTx">Transmitter</button><button class="btn" id="bPauseLog">Logbook</button><button class="btn" id="bPauseReset">Reset</button><button class="btn" id="bPauseMenu">Main menu</button></div>
     </div>
 
     <div class="card" id="logCard" hidden>
@@ -252,36 +301,23 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </div>
 
   <div id="drawer" hidden>
-    <div class="row" style="justify-content:space-between"><h2>Transmitter</h2><button class="btn mini" id="bClose">Close</button></div>
-    <div class="hint" id="padName">No gamepad detected. Plug in the FlySky sim cable, switch the transmitter on and move a stick. Use Chrome on the Mac.</div>
-    <div class="axes" id="axes"></div>
-    <div class="sec">
-      <div class="row" style="justify-content:space-between"><div class="lbl">Channels</div><button class="btn mini primary" id="bWizard">Run setup wizard</button></div>
-      <div id="wiz" hidden><b id="wizText"></b><span class="hint" id="wizSub"></span><div class="row"><button class="btn mini" id="bWizCancel">Cancel</button></div></div>
-      <div class="ch" id="ch-ail"></div>
-      <div class="ch" id="ch-ele"></div>
-      <div class="ch" id="ch-thr"></div>
-      <div class="ch" id="ch-rud"></div>
-      <div class="ch" id="ch-sw"></div>
-      <div class="hint">Assign: tap, then move only that stick. Inv flips a channel. Trim nudges the centre, like the trim tabs on the FS-i6. Axis travel is calibrated automatically as you move the sticks to their ends.</div>
-      <div class="row"><button class="btn mini" id="bCal">Reset calibration</button><button class="btn mini" id="bTrim0">Zero trims</button></div>
-    </div>
+    <div class="row" style="justify-content:space-between"><h2>Field and feel</h2><button class="btn mini" id="bClose">Close</button></div>
     <div class="sec">
       <div class="lbl">Feel</div>
       <div class="sl"><span>Rates</span><input type="range" id="sRates" min="40" max="140" value="100"><output id="oRates">100%</output></div>
       <div class="sl"><span>Expo</span><input type="range" id="sExpo" min="0" max="80" value="30"><output id="oExpo">30%</output></div>
       <div class="sl"><span>Low rate</span><input type="range" id="sLow" min="40" max="90" value="65"><output id="oLow">65%</output></div>
-      <div class="hint">Rates switch: assign SWA (channel 5) above, or press <kbd>L</kbd>. Low rate softens all three axes, like dual rates on the FS-i6.</div>
-    </div>
-    <div class="sec">
-      <div class="lbl">Sound</div>
-      <div class="sl"><span>Volume</span><input type="range" id="sVol" min="0" max="100" value="70"><output id="oVol">70%</output></div>
+      <div class="hint">Map a switch to Dual rates in Transmitter setup, or press <kbd>L</kbd>. Trims live in Transmitter setup.</div>
     </div>
     <div class="sec">
       <div class="lbl">Field</div>
       <div class="sl"><span>Wind</span><input type="range" id="sWind" min="0" max="8" step="0.5" value="2"><output id="oWind">2 m/s</output></div>
       <div class="sl"><span>From</span><input type="range" id="sWdir" min="0" max="359" step="5" value="330"><output id="oWdir">330°</output></div>
       <div class="sl"><span>Gusts</span><input type="range" id="sGust" min="0" max="100" value="35"><output id="oGust">35%</output></div>
+    </div>
+    <div class="sec">
+      <div class="lbl">Sound and display</div>
+      <div class="sl"><span>Volume</span><input type="range" id="sVol" min="0" max="100" value="70"><output id="oVol">70%</output></div>
       <label class="toggle"><input type="checkbox" id="cSticks"> Show touch sticks</label>
       <label class="toggle"><input type="checkbox" id="cShadow" checked> Shadows</label>
     </div>
@@ -292,7 +328,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <script>
 (function(){
 'use strict';
-if(!window.THREE){document.getElementById('startCard').innerHTML='<h1>3D library did not load</h1><p>Check the connection and reload.</p>';return;}
+if(!window.THREE){document.getElementById('menuCard').innerHTML='<h1>3D library did not load</h1><p>Check the connection and reload.</p>';return;}
 
 /* JG Flight Sim physics. Aero convention inside: X forward, Y right, Z down; L roll right+, M nose up+, N nose right+.
    Three.js body frame: x right, y up, z aft. Converted at the end of each step. */
@@ -300,7 +336,7 @@ const Sim=(function(THREE){
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V3=THREE.Vector3;
 const AC={
-  name:'CraycleCub V2', mass:0.62, span:0.80, chord:0.19, S:0.152, AR:4.2, e:0.80,
+  name:'CraycleCub V2', mass:0.62, features:{flaps:false,gear:false}, flapCL:0.9, flapCD:0.06, flapCm:-0.25, span:0.80, chord:0.19, S:0.152, AR:4.2, e:0.80,
   wingPos:new V3(0,0.03,0.004), incidence:0.026, CL0:0.25, CLa:4.3, aStall:0.245, stallW:0.035, CD0:0.055, Cm0:-0.035,
   St:0.026, tailPos:new V3(0,0.01,0.30), CLat:3.4, tauE:0.55, deMax:0.38, dEps:0.35, aStallT:0.30, tailWash:0.4, tailInc:-0.012,
   Sf:0.014, finPos:new V3(0,0.07,0.28), CLaf:2.6, tauR:0.55, drMax:0.52, finWash:0.4,
@@ -349,17 +385,18 @@ function step(st,inp,dt,env){
   const n=Math.hypot(ex,ez)||1; const lx=ez/n, lz=-ex/n; // lift direction (perp to flow, in symmetry plane)
   const qd=0.5*rho*V*V;
   // wing
+  const df=inp.flap||0; // flap deflection, rad
   const aw=alpha+AC.incidence;
   const sig=1/(1+Math.exp(-(Math.abs(aw)-AC.aStall)/AC.stallW));
   const hb=clamp((st.pos.y-0.1)/AC.span,0,10), ge=Math.exp(-4*hb);
-  let CL=((1-sig)*(AC.CL0+AC.CLa*aw)+sig*Math.sin(2*aw))*(1+0.06*ge);
-  const CD=AC.CD0+CL*CL/(Math.PI*AC.AR*AC.e)*(1-0.55*ge)+sig*1.4*Math.sin(aw)*Math.sin(aw)+(st.thr<0.05?0.012:0);
+  let CL=((1-sig)*(AC.CL0+AC.flapCL*df+AC.CLa*aw)+sig*Math.sin(2*aw))*(1+0.06*ge);
+  const CD=AC.CD0+AC.flapCD*df*df*6+CL*CL/(Math.PI*AC.AR*AC.e)*(1-0.55*ge)+sig*1.4*Math.sin(aw)*Math.sin(aw)+(st.thr<0.05?0.012:0);
   const L=qd*AC.S*CL, D=qd*AC.S*CD;
   let FX=L*lx-D*ex, FY=-D*ey+qd*AC.S*AC.CYb*beta, FZ=L*lz-D*ez;
   let Lm=0,Mm=0,Nm=0;
   { const rx=-AC.wingPos.z, ry=AC.wingPos.x, rz=-AC.wingPos.y;
     Lm+=ry*FZ-rz*FY; Mm+=rz*FX-rx*FZ; Nm+=rx*FY-ry*FX; }
-  Mm+=qd*AC.S*AC.chord*AC.Cm0;
+  Mm+=qd*AC.S*AC.chord*(AC.Cm0+AC.flapCm*df);
   // horizontal tail (in slipstream)
   const uT=Math.sqrt(Math.max(u,0)*Math.max(u,0)+AC.tailWash*slip2), Vt2=uT*uT+v*v+wv*wv, Vt=Math.sqrt(Vt2), lt=AC.tailPos.z;
   let at=(Vt>0.5?Math.atan2(wv*(1-AC.dEps),Math.max(uT,0.1)):0)+AC.tailInc-AC.tauE*inp.ele*AC.deMax+(Vt>1?q*lt/Vt:0);
@@ -444,10 +481,10 @@ const $=id=>document.getElementById(id);
 const clamp=Sim.clamp, AC=Sim.AC;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const SAVE_V=2;
+const SAVE_V=3;
 const store={get(k,d){try{const raw=localStorage.getItem(k);if(!raw)return d;const v=JSON.parse(raw);if(v&&typeof v==='object'&&!Array.isArray(v)){if(v.__v!==undefined&&v.__v>SAVE_V)return d;delete v.__v;}return v;}catch(e){return d}},set(k,v){try{if(v&&typeof v==='object'&&!Array.isArray(v))v={...v,__v:SAVE_V};localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
 const num=(v,d,a,b)=>typeof v==='number'&&isFinite(v)?clamp(v,a,b):d;
-const settings=Object.assign({rates:100,expo:30,low:65,vol:70,wind:2,wdir:330,gust:35,sticks:false,shadow:true},store.get('jgsim.settings',{}));
+const settings=Object.assign({rates:100,expo:30,low:65,vol:70,wind:2,wdir:330,gust:35,sticks:false,shadow:true,tele:'full'},store.get('jgsim.settings',{}));
 ['rates','expo','low','vol','wind','wdir','gust'].forEach(k=>{const d={rates:100,expo:30,low:65,vol:70,wind:2,wdir:330,gust:35}[k];settings[k]=num(settings[k],d,0,400);});
 const trims=Object.assign({ail:0,ele:0,rud:0},store.get('jgsim.trims',{}));
 ['ail','ele','rud'].forEach(k=>trims[k]=num(trims[k],0,-0.3,0.3));
@@ -455,10 +492,9 @@ const logbook=Object.assign({flights:0,airtime:0,landings:0,firm:0,hard:0,crashe
 ['flights','airtime','landings','firm','hard','crashes','violations','longest'].forEach(k=>logbook[k]=num(logbook[k],0,0,1e9));
 if(logbook.bestGate!==null&&typeof logbook.bestGate!=='number')logbook.bestGate=null;
 
-/* ---------- game state ---------- */
 let st=Sim.create();
-const G={mode:'free',cam:'pilot',sound:false,started:false,crashed:false,landed:false,paused:false,lowRate:false,viol:0,lastGroundT:0,flightStart:0,preflight:{ail:false,ele:false,rud:false,wind:false},trauma:0,frameMs:16,fps:60};
-const IN={ail:0,ele:0,rud:0,thr:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0};
+const G={mode:'free',cam:'pilot',view:'fly',sound:false,started:false,flying:false,crashed:false,landed:false,paused:false,lowRate:false,cut:false,flapPos:0,gearUp:false,viol:0,lastGroundT:0,flightStart:0,preflight:{ail:false,ele:false,rud:false,wind:false},trauma:0,frameMs:16,fps:60};
+const IN={ail:0,ele:0,rud:0,thr:0,flap:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
 
 /* ---------- scene ---------- */
 const canvas=$('c');
@@ -509,31 +545,53 @@ const PILOT_EYE=new THREE.Vector3(2.5,1.65,4.5);
 const sock=new THREE.Group();const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.05,5,6),lam(0xF7F4EE));pole.position.y=2.5;sock.add(pole);
 const cone=new THREE.Mesh(new THREE.ConeGeometry(0.28,1.6,10,1,true),new THREE.MeshLambertMaterial({color:0xF26522,side:THREE.DoubleSide}));cone.rotation.z=-Math.PI/2;cone.position.set(0.8,5,0);const sockArm=new THREE.Group();sockArm.position.y=0;sockArm.add(cone);sock.add(sockArm);sock.position.set(-8,0,-6);sock.traverse(o=>o.castShadow=true);scene.add(sock);
 
-/* ---------- aircraft mesh ---------- */
+
+/* ---------- aircraft data sheet (shown in the Hangar) ---------- */
+const SHEET=[
+  ['Aircraft','CraycleCub V2 (Craycle, 3D printed)'],['Wingspan','800 mm'],['Mean chord','190 mm'],['Wing area','15.2 dm²'],['All-up weight','620 g'],
+  ['Wing loading','40.8 g/dm²'],['Motor','2205 2300KV brushless'],['ESC','30 A, Roboduino'],['Prop','6 x 4 in'],['Battery','3S 2200 mAh 35C LiPo'],
+  ['Static thrust','about 720 g'],['Thrust to weight','1.16'],['Stall speed','26 km/h (clean)'],['Best glide','about 34 km/h, L/D 6'],['Cruise at 50%','about 60 km/h'],
+  ['Gear','fixed tail-dragger, steerable tailwheel'],['Flaps','not fitted'],['Receiver','FlySky FS-iA6B, 6 ch'],['Channels','1 ail, 2 ele, 3 thr, 4 rud, 5 SWA, 6 SWB'],
+  ['Battery alarm','3.6 V per cell'],['CG','20% MAC, static margin 16%'],['Print','PLA Pro+ airframe, PETG mounts, TPU tyres'],
+];
+
+/* ---------- aircraft mesh, hinged control surfaces ---------- */
 const black=pbr(0x1d2126,0.5), white=pbr(0xF7F4EE,0.45), ice=pbr(0x9ccfe8,0.2), orange=pbr(0xF26522,0.5);
 const plane=new THREE.Group();
 function part(geo,m,x,y,z,parent){const b=new THREE.Mesh(geo,m);b.position.set(x,y,z);b.castShadow=true;(parent||plane).add(b);return b;}
 const bx=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
-part(bx(0.075,0.085,0.46),black,0,0,0.02);
-part(bx(0.08,0.09,0.12),white,0,0,-0.26);
-part(bx(0.06,0.05,0.12),ice,0,0.065,-0.08);
+/* hinge(): a Group at the hinge line; the surface mesh hangs aft of it, so rotation about the group is a real hinge */
+function hinge(w,h,d,m,x,y,zHinge,parent){const g=new THREE.Group();g.position.set(x,y,zHinge);const mesh=new THREE.Mesh(bx(w,h,d),m);mesh.position.set(0,0,d/2);mesh.castShadow=true;g.add(mesh);(parent||plane).add(g);return g;}
+part(bx(0.075,0.085,0.46),black,0,0,0.02);           // fuselage
+part(bx(0.08,0.09,0.12),white,0,0,-0.26);            // nose
+part(bx(0.06,0.05,0.12),ice,0,0.065,-0.08);          // canopy
 const wingL=new THREE.Group(),wingR=new THREE.Group();wingL.position.set(-0.03,0.045,-0.04);wingR.position.set(0.03,0.045,-0.04);wingL.rotation.z=0.05;wingR.rotation.z=-0.05;plane.add(wingL,wingR);
-part(bx(0.29,0.014,0.19),black,-0.16,0,0,wingL);part(bx(0.09,0.015,0.19),white,-0.35,0,0,wingL);
-part(bx(0.29,0.014,0.19),black,0.16,0,0,wingR);part(bx(0.09,0.015,0.19),white,0.35,0,0,wingR);
-const ailL=part(bx(0.2,0.01,0.05),orange,-0.21,0,0.105,wingL), ailR=part(bx(0.2,0.01,0.05),orange,0.21,0,0.105,wingR);
+part(bx(0.29,0.014,0.14),black,-0.16,0,-0.025,wingL);part(bx(0.09,0.015,0.19),white,-0.35,0,0,wingL);
+part(bx(0.29,0.014,0.14),black,0.16,0,-0.025,wingR);part(bx(0.09,0.015,0.19),white,0.35,0,0,wingR);
+const ailL=hinge(0.2,0.01,0.05,orange,-0.21,0,0.045,wingL), ailR=hinge(0.2,0.01,0.05,orange,0.21,0,0.045,wingR);
+const flapL=hinge(0.09,0.01,0.05,black,-0.065,0,0.045,wingL), flapR=hinge(0.09,0.01,0.05,black,0.065,0,0.045,wingR);
 [-1,1].forEach(s=>{const strut=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,0.21,5),white);strut.position.set(s*0.14,-0.02,-0.03);strut.rotation.z=s*1.0;strut.rotation.x=0.1;plane.add(strut);});
-part(bx(0.3,0.008,0.085),white,0,0.01,0.26);
-const elev=part(bx(0.3,0.008,0.045),orange,0,0.01,0.325);
-part(bx(0.008,0.13,0.1),white,0,0.07,0.26);
-const rudd=part(bx(0.008,0.1,0.04),orange,0,0.07,0.33);
+part(bx(0.3,0.008,0.085),white,0,0.01,0.26);         // stabiliser
+const elev=hinge(0.3,0.008,0.045,orange,0,0.01,0.303); // elevator, hinge at the stab trailing edge
+part(bx(0.008,0.13,0.1),white,0,0.07,0.26);          // fin
+const rudd=hinge(0.008,0.1,0.04,orange,0,0.07,0.31);  // rudder, hinge at the fin trailing edge
 const prop=new THREE.Mesh(new THREE.CylinderGeometry(0.076,0.076,0.004,24),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0.3}));prop.rotation.x=Math.PI/2;prop.position.set(0,0,-0.325);plane.add(prop);
 const propBlade=part(bx(0.152,0.012,0.004),black,0,0,-0.325);
 AC.wheels.forEach(W=>{const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.004,0.004,0.07,5),black);leg.position.set(W.p.x,W.p.y+0.04,W.p.z);plane.add(leg);const wh=new THREE.Mesh(new THREE.CylinderGeometry(W.r,W.r,0.012,12),black);wh.rotation.z=Math.PI/2;wh.position.copy(W.p);plane.add(wh);});
 scene.add(plane);
-// threejs-gltf-loading: if assets/craycle-cub.glb exists (export from the Craycle STLs), it replaces the box model.
-// Name nodes ailL, ailR, elev, rudd, prop in the GLB and they animate. Fails silently otherwise.
-(function tryGLB(){if(!/^https?:/.test(location.protocol))return;const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';s.onload=()=>{try{new THREE.GLTFLoader().load('assets/craycle-cub.glb',g=>{const m=g.scene;m.traverse(o=>{if(o.isMesh){o.castShadow=true;}});plane.children.slice().forEach(c=>{if(c!==propBlade&&c!==prop)plane.remove(c);});plane.add(m);const find=n=>m.getObjectByName(n);const a=find('ailL'),b=find('ailR'),e=find('elev'),r=find('rudd');if(a&&b&&e&&r){surf.ailL=a;surf.ailR=b;surf.elev=e;surf.rudd=r;}},undefined,()=>{});}catch(e){}};s.onerror=()=>{};document.head.appendChild(s);})();
-const surf={ailL,ailR,elev,rudd};
+const surf={ailL,ailR,elev,rudd,flapL,flapR};
+/* Sign conventions (verified against the hinge geometry): trailing edge sits at local +z of each hinge group.
+   rotation.x > 0 moves the trailing edge DOWN; rotation.y > 0 moves it to the RIGHT (+x).
+   Pull (IN.ele > 0) = elevator trailing edge UP. Right stick (IN.ail > 0) = right aileron UP, left DOWN. Right rudder = trailing edge RIGHT. */
+function animateSurfaces(IN){
+  surf.ailL.rotation.x=IN.ail*0.45; surf.ailR.rotation.x=-IN.ail*0.45;
+  surf.elev.rotation.x=-IN.ele*0.45;
+  surf.rudd.rotation.y=IN.rud*0.5;
+  surf.flapL.rotation.x=surf.flapR.rotation.x=IN.flap;
+}
+// threejs-gltf-loading: assets/craycle-cub.glb (exported from the Craycle STLs) replaces the box model if present.
+// Name the hinge nodes ailL, ailR, elev, rudd, flapL, flapR in the GLB and they animate. Fails silently otherwise.
+(function tryGLB(){if(!/^https?:/.test(location.protocol))return;const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';s.onload=()=>{try{new THREE.GLTFLoader().load('assets/craycle-cub.glb',g=>{const m=g.scene;m.traverse(o=>{if(o.isMesh)o.castShadow=true;});plane.children.slice().forEach(c=>{if(c!==propBlade&&c!==prop)plane.remove(c);});plane.add(m);['ailL','ailR','elev','rudd','flapL','flapR'].forEach(n=>{const o=m.getObjectByName(n);if(o)surf[n]=o;});},undefined,()=>{});}catch(e){}};s.onerror=()=>{};document.head.appendChild(s);})();
 
 /* ---------- feedback: pooled dust particles, flash, trauma (game-feel) ---------- */
 const PN=240;const pPos=new Float32Array(PN*3),pVel=new Float32Array(PN*3),pAge=new Float32Array(PN);let pNext=0;
@@ -549,6 +607,7 @@ function feedback(tier,x,y,z){if(tier==='small'){burst(x,y,z,10,1.5,1.2);}else i
 const tweens=[];function tween(obj,from,to,dur,ease){tweens.push({obj,from,to,dur,t:0,ease});}
 const easeOutBack=t=>{const c=1.70158;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);};
 function updateTweens(dt){for(let i=tweens.length-1;i>=0;i--){const w=tweens[i];w.t+=dt;const k=Math.min(1,w.t/w.dur);const e=w.ease(k);w.obj.scale.setScalar(w.from+(w.to-w.from)*e);if(k>=1)tweens.splice(i,1);}}
+
 
 /* ---------- gates ---------- */
 const GATES=[[0,10,-120,0],[60,14,-140,Math.PI/2],[95,12,-70,Math.PI*0.75],[55,16,-10,Math.PI],[-55,11,-20,Math.PI*1.3],[-85,14,-90,Math.PI*1.6]];
@@ -589,26 +648,52 @@ function marshal(){
   if(st.stall>0.5&&st.V>2&&!st.onGround)say('Stall.','warn','stall',4);
 }
 
-/* ---------- input: gamepad ---------- */
-const map=Object.assign({ail:{axis:0,inv:false},ele:{axis:1,inv:false},thr:{axis:2,inv:false},rud:{axis:3,inv:false},sw:{axis:-1,inv:false}},store.get('jgsim.map',{}));
-for(const k of ['ail','ele','thr','rud','sw']){if(!map[k]||typeof map[k].axis!=='number')map[k]={axis:k==='sw'?-1:0,inv:false};}
-let cal=store.get('jgsim.cal',{});
-let pad=null,padAxes=[],assigning=null,assignBase=null,assignT=0;
-function pollPad(){const gps=navigator.getGamepads?navigator.getGamepads():[];pad=null;for(const g of gps){if(g&&g.connected){pad=g;break;}}if(!pad){padAxes=[];return false;}padAxes=Array.from(pad.axes);padAxes.forEach((v,i)=>{let c=cal[i];if(!c){c=cal[i]={min:v,max:v};}if(v<c.min)c.min=v;if(v>c.max)c.max=v;});return true;}
-let calDirty=0;
-function normAxis(i){const v=padAxes[i],c=cal[i];if(!c)return clamp(v,-1,1);const span=c.max-c.min;if(span<1.2)return clamp(v,-1,1);return clamp((v-c.min)/span*2-1,-1,1);}
-function axisVal(ch){const m=map[ch];if(!pad||m.axis<0||m.axis>=padAxes.length)return null;let v=normAxis(m.axis);if(m.inv)v=-v;return v;}
-function expo(v,e){return v*(1-e)+v*v*v*e;}
-window.addEventListener('gamepadconnected',()=>{pollPad();showPad();});
-window.addEventListener('gamepaddisconnected',()=>{pad=null;showPad();});
-function showPad(){const el=$('txState');if(pad){el.textContent=pad.id.slice(0,48)+' detected';el.className='ok';}else{el.textContent='not detected. Plug in the sim cable and move a stick.';el.className='no';}}
 
-/* ---------- input: keyboard ---------- */
+/* ---------- input system (input-systems skill): named functions, per-device bindings, calibration ---------- */
+const FUNCS=[
+  {id:'ail',name:'Aileron',kind:'stick',need:true,dir:'Move the RIGHT stick fully to the RIGHT',verify:'Hold the stick RIGHT and watch the wing: the RIGHT aileron should go UP, the left one DOWN.'},
+  {id:'ele',name:'Elevator',kind:'stick',need:true,dir:'Pull the RIGHT stick fully BACK (towards you)',verify:'Hold the stick BACK and watch the tail: the elevator trailing edge should go UP.'},
+  {id:'thr',name:'Throttle',kind:'stick',need:true,dir:'Push the LEFT stick fully UP (full throttle), then bring it all the way down',verify:'With the stick fully DOWN the throttle bar should read 0%. Push it up slowly: the prop should spin up.'},
+  {id:'rud',name:'Rudder',kind:'stick',need:true,dir:'Move the LEFT stick fully to the RIGHT',verify:'Hold the stick RIGHT and watch the fin: the rudder should swing to the RIGHT (its right side).'},
+  {id:'rates',name:'Dual rates',kind:'switch',hint:'usually SWA',desc:'Low rate softens all three axes'},
+  {id:'cut',name:'Throttle cut',kind:'switch',hint:'usually SWB',desc:'Arms and disarms the motor'},
+  {id:'flap',name:'Flaps',kind:'switch3',feature:'flaps',hint:'SWC (3 position)',desc:'0 / 15 / 35 degrees'},
+  {id:'gear',name:'Landing gear',kind:'switch',feature:'gear',desc:'Retract and extend'},
+  {id:'cam',name:'Camera',kind:'button',hint:'any switch or button',desc:'Cycle pilot, chase, FPV'},
+  {id:'reset',name:'Reset',kind:'button',hint:'any switch or button',desc:'Back on the strip'},
+];
+const FUNC=Object.fromEntries(FUNCS.map(f=>[f.id,f]));
+const devices=store.get('jgsim.devices',{});   // {deviceId:{map:{fn:{src:'a0'|'b2'|null,inv:false}},cal:{a0:{min,max}},done:bool}}
+let pad=null,padAxes=[],padButtons=[],dev=null,devId=null;
+function defaultMap(){const m={};FUNCS.forEach(f=>m[f.id]={src:null,inv:false});return m;}
+function legacyImport(){const old=store.get('jgsim.map',null);if(!old)return null;const m=defaultMap();['ail','ele','thr','rud'].forEach(k=>{if(old[k]&&old[k].axis>=0)m[k]={src:'a'+old[k].axis,inv:!!old[k].inv};});if(old.sw&&old.sw.axis>=0)m.rates={src:'a'+old.sw.axis,inv:false};return m;}
+function selectPad(){
+  const gps=navigator.getGamepads?navigator.getGamepads():[];let best=null;
+  for(const g of gps){if(g&&g.connected){if(!best||g.axes.length>best.axes.length)best=g;}}
+  if(!best){pad=null;padAxes=[];padButtons=[];return false;}
+  pad=best;padAxes=Array.from(pad.axes);padButtons=Array.from(pad.buttons).map(b=>typeof b==='object'?(b.pressed?1:b.value||0):(b>0.5?1:0));
+  if(devId!==pad.id){devId=pad.id;dev=devices[devId];if(!dev){const legacy=legacyImport();dev=devices[devId]={map:legacy||defaultMap(),cal:{},done:!!legacy};devices[devId]=dev;saveDevices();onNewDevice(!legacy);}}
+  padAxes.forEach((v,i)=>{let c=dev.cal['a'+i];if(!c)c=dev.cal['a'+i]={min:v,max:v};if(v<c.min)c.min=v;if(v>c.max)c.max=v;});
+  return true;
+}
+let devSaveT=0;function saveDevices(){store.set('jgsim.devices',devices);}
+function normAxis(i){const v=padAxes[i],c=dev&&dev.cal['a'+i];if(c===undefined||!c)return clamp(v,-1,1);const span=c.max-c.min;if(span<1.2)return clamp(v,-1,1);return clamp((v-c.min)/span*2-1,-1,1);}
+function readSrc(src){if(!pad||!src)return null;const n=+src.slice(1);if(src[0]==='a'){if(n>=padAxes.length)return null;return normAxis(n);}if(src[0]==='b'){if(n>=padButtons.length)return null;return padButtons[n]>0.5?1:-1;}return null;}
+function fnVal(id){if(!dev)return null;const m=dev.map[id];if(!m||!m.src)return null;let v=readSrc(m.src);if(v===null)return null;return m.inv?-v:v;}
+function expo(v,e){return v*(1-e)+v*v*v*e;}
+window.addEventListener('gamepadconnected',()=>{selectPad();showPad();});
+window.addEventListener('gamepaddisconnected',()=>{pad=null;showPad();});
+function showPad(){const el=$('txState');if(!el)return;if(pad){el.textContent=pad.id.slice(0,44)+(dev&&dev.done?' · mapped':' · needs setup');el.className=dev&&dev.done?'ok':'no';}else{el.textContent='not detected. Plug in the sim cable, switch the TX on, move a stick.';el.className='no';}}
+function mappedSticks(){return dev&&['ail','ele','thr','rud'].every(k=>dev.map[k].src);}
+
+/* keyboard */
 const keys={};let kThr=0;
-window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL'){G.lowRate=!G.lowRate;}if(e.code==='KeyP'||e.code==='Escape')togglePause();if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
+window.addEventListener('keydown',e=>{keys[e.code]=true;
+  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.lowRate=!G.lowRate;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyF')G.flapPos=(G.flapPos+1)%3;if(e.code==='KeyP'||e.code==='Escape')togglePause();
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 
-/* ---------- input: touch ---------- */
+/* touch sticks */
 const touch={l:{x:0,y:-1,id:null},r:{x:0,y:0,id:null}};
 function bindStick(el,key,springY){const nub=el.querySelector('.nub');const s=touch[key];let cx,cy,R;function set(dx,dy){s.x=clamp(dx/R,-1,1);s.y=clamp(-dy/R,-1,1);nub.style.transform=`translate(${s.x*R*0.75}px,${-s.y*R*0.75}px)`;}
 el.addEventListener('pointerdown',e=>{const r=el.getBoundingClientRect();cx=r.left+r.width/2;cy=r.top+r.height/2;R=r.width/2;s.id=e.pointerId;el.setPointerCapture(e.pointerId);set(e.clientX-cx,e.clientY-cy);});
@@ -619,10 +704,18 @@ bindStick($('stL'),'l',false);bindStick($('stR'),'r',true);
 $('stL').querySelector('.nub').style.transform='translate(0px,48px)';
 function setSticks(on){settings.sticks=on;$('sticks').classList.toggle('show',on);$('cSticks').checked=on;saveSettings();}
 
+/* edge detectors for button-type functions */
+const edge={cam:false,reset:false,gear:false};
 function readInput(){
   const ex=settings.expo/100, rt=settings.rates/100;
   let a=0,e=0,r=0,t=null,src='keyboard';
-  if(pollPad()){const va=axisVal('ail'),ve=axisVal('ele'),vr=axisVal('rud'),vt=axisVal('thr');if(va!==null)a=va;if(ve!==null)e=ve;if(vr!==null)r=vr;if(vt!==null)t=(vt+1)/2;src='transmitter';}
+  if(selectPad()&&mappedSticks()){const va=fnVal('ail'),ve=fnVal('ele'),vr=fnVal('rud'),vt=fnVal('thr');if(va!==null)a=va;if(ve!==null)e=ve;if(vr!==null)r=vr;if(vt!==null)t=(vt+1)/2;src='transmitter';
+    const sw=fnVal('rates');if(sw!==null)G.lowRate=sw>0.3;
+    const cut=fnVal('cut');G.cut=cut!==null&&cut>0.3;
+    const fl=fnVal('flap');if(fl!==null&&AC.features.flaps)G.flapPos=fl<-0.3?0:fl>0.3?2:1;
+    const inFlight=$('overlay').hidden&&G.started;['cam','reset','gear'].forEach(k=>{const v=fnVal(k);const on=v!==null&&v>0.3;if(on&&!edge[k]&&inFlight){if(k==='cam')cycleCam();else if(k==='reset')reset();else G.gearUp=!G.gearUp;}edge[k]=on;});
+    if(++devSaveT>240){devSaveT=0;saveDevices();}
+  } else G.cut=false;
   const touching=touch.l.id!==null||touch.r.id!==null;
   if(touching){a=touch.r.x;e=-touch.r.y;r=touch.l.x;t=(touch.l.y+1)/2;src='touch';}
   else if(src==='keyboard'){
@@ -631,63 +724,72 @@ function readInput(){
     t=settings.sticks?(touch.l.y+1)/2:kThr;
   }
   if(t===null)t=kThr;
-  // radial deadzone on the right stick (input-systems): rescaled from the edge of the zone
   const dead=0.04;const mag=Math.hypot(a,e);if(mag<dead){a=0;e=0;}else{const sc=Math.min((mag-dead)/(1-dead),1)/mag;a*=sc;e*=sc;}
   r=Math.abs(r)<dead?0:(r-Math.sign(r)*dead)/(1-dead);
-  IN.rawAil=a;IN.rawEle=e;IN.rawRud=r;
-  if(src==='transmitter'){const sv=axisVal('sw');if(sv!==null)G.lowRate=sv>0.3;}
+  IN.rawAil=a;IN.rawEle=e;IN.rawRud=r;IN.rawThr=t;
   const lr=G.lowRate?settings.low/100:1;
-  IN.ail=clamp(expo(a,ex)*rt*lr+trims.ail,-1,1);IN.ele=clamp(expo(e,ex)*rt*lr+trims.ele,-1,1);IN.rud=clamp(expo(r,ex)*rt*lr+trims.rud,-1,1);IN.thr=clamp(t,0,1);IN.src=src;
+  IN.ail=clamp(expo(a,ex)*rt*lr+trims.ail,-1,1);IN.ele=clamp(expo(e,ex)*rt*lr+trims.ele,-1,1);IN.rud=clamp(expo(r,ex)*rt*lr+trims.rud,-1,1);
+  IN.thr=G.cut?0:clamp(t,0,1);IN.src=src;
+  IN.flap=AC.features.flaps?[0,0.26,0.61][G.flapPos]:0;
 }
 
-/* ---------- flow ---------- */
-function show(id){$('overlay').hidden=false;['startCard','preCard','crashCard','landCard','winCard','logCard','pauseCard'].forEach(c=>$(c).hidden=c!==id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b)setTimeout(()=>b.focus(),30);}
-function togglePause(){if(!G.started||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.started&&!G.paused&&$('overlay').hidden&&!G.crashed&&!G.landed){G.paused=true;show('pauseCard');}});
-function hide(){$('overlay').hidden=true;}
-function fmtTime(s){s=Math.max(0,Math.floor(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
-function save(){store.set('jgsim.log',logbook);}
-function saveSettings(){store.set('jgsim.settings',settings);}
-function reset(){
-  st=Sim.create();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;kThr=0;touch.l.y=-1;$('stL').querySelector('.nub').style.transform='translate(0px,48px)';
-  MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
-  gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
-  gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
-  camPos.set(0,1.2,3);
-  if(G.started){hide();say('On the strip. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','', 'rwy',0);}else show('startCard');
+/* ---------- transmitter setup screen: autodetect, guided wizard with live verification, free mapping ---------- */
+const wiz={on:false,i:0,phase:'detect',base:null,baseB:null,t:0,steps:[]};
+function fnAvailable(f){return !f.feature||AC.features[f.feature];}
+function usedSrcs(exceptId){const u=new Set();if(!dev)return u;for(const k in dev.map){if(k!==exceptId&&dev.map[k].src)u.add(dev.map[k].src);}return u;}
+function srcLabel(src){if(!src)return 'not set';return (src[0]==='a'?'Axis ':'Button ')+src.slice(1);}
+function buildTx(){
+  const rows=FUNCS.map(f=>{const av=fnAvailable(f);return `<div class="fnrow${av?'':' off'}" data-fn="${f.id}"><span class="fnname">${f.name}<small>${av?(f.desc||''):'not fitted on this aircraft'}</small></span><div class="bar"><i id="fb-${f.id}"></i></div><button class="btn mini" data-assign="${f.id}"${av?'':' disabled'}>${srcLabel(null)}</button><button class="btn mini" data-inv="${f.id}"${av?'':' disabled'}>Rev</button><button class="btn mini" data-clear="${f.id}"${av?'':' disabled'} title="Clear">×</button></div>`;}).join('');
+  $('fnTable').innerHTML=rows;
+  $('txCard').addEventListener('click',e=>{const a=e.target.closest('[data-assign]'),i=e.target.closest('[data-inv]'),c=e.target.closest('[data-clear]');
+    if(a&&dev){startAssign(a.dataset.assign);}
+    if(i&&dev){dev.map[i.dataset.inv].inv=!dev.map[i.dataset.inv].inv;saveDevices();refreshTx();}
+    if(c&&dev){dev.map[c.dataset.clear]={src:null,inv:false};saveDevices();refreshTx();}});
 }
-function startFlight(){G.started=true;hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();say('Cleared to taxi. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s. Keep it in front of the line.','good');}
-function endFlight(kind,why){
-  const air=st.time-G.flightStart;
-  logbook.flights++;logbook.airtime+=air;if(air>logbook.longest)logbook.longest=air;
-  if(kind==='crash'){logbook.crashes++;G.crashed=true;G.lastCrash=why;feedback('large',st.pos.x,Math.max(st.pos.y,0.05),st.pos.z);thud(1);$('crashWhy').textContent=why;$('crashTime').textContent=fmtTime(air);$('crashSpd').textContent=Math.round(st.maxV*3.6);$('crashAlt').textContent=st.maxAlt.toFixed(0);setTimeout(()=>{if(G.crashed)show('crashCard');},reduceMotion?0:650);if(audio)audio.motor.gain.setTargetAtTime(0,audio.ctx.currentTime,0.05);}
-  else{G.landed=true;const td=st.touchdown||{sink:0};let grade='Greaser.';if(td.sink>1.8){grade='Hard landing, but it lives.';logbook.hard++;}else if(td.sink>1.0){grade='Firm landing.';logbook.firm++;}else logbook.landings++;$('landWhy').textContent=grade+' Touched down at '+(td.speed*3.6).toFixed(0)+' km/h, sink '+td.sink.toFixed(1)+' m/s.';$('landTime').textContent=fmtTime(air);$('landSink').textContent=td.sink.toFixed(1);$('landViol').textContent=G.viol;show('landCard');}
-  save();
+let assignFn=null,assignBase=null,assignBaseB=null,assignT=0;
+function startAssign(id){if(!pad){$('txHint').textContent='No transmitter detected. Move a stick first.';return;}assignFn=id;assignBase=padAxes.slice();assignBaseB=padButtons.slice();assignT=performance.now();refreshTx();}
+function detectChange(base,baseB,minA,skip){skip=skip||new Set();let best=null,bd=minA||0.5,sign=0;padAxes.forEach((v,i)=>{if(skip.has('a'+i))return;const d=v-base[i];if(Math.abs(d)>bd){bd=Math.abs(d);best='a'+i;sign=Math.sign(d);}});padButtons.forEach((v,i)=>{if(skip.has('b'+i))return;if(Math.abs(v-baseB[i])>0.5){best='b'+i;sign=v>baseB[i]?1:-1;}});return best?{src:best,sign}:null;}
+function refreshTx(){
+  if($('txCard').hidden||!dev)return;
+  FUNCS.forEach(f=>{const m=dev.map[f.id];const b=$('txCard').querySelector(`[data-assign="${f.id}"]`);if(b)b.textContent=assignFn===f.id?'Move it now…':srcLabel(m.src);const inv=$('txCard').querySelector(`[data-inv="${f.id}"]`);if(inv)inv.classList.toggle('on',!!m.inv);const bar=$('fb-'+f.id);if(bar){let v=fnVal(f.id);if(v===null)v=-1;bar.style.width=(((v+1)/2)*100).toFixed(0)+'%';}});
+  $('txDevice').textContent=pad?pad.id.slice(0,64):'No transmitter detected';
+  $('txMeta').textContent=pad?padAxes.length+' axes · '+padButtons.length+' buttons · '+(dev.done?'setup complete':'setup pending'):'Plug in the sim cable, switch the transmitter on and move a stick. Chrome on the Mac.';
+  const ax=$('txAxes');const n=padAxes.length+padButtons.length;if(ax.childElementCount!==n){ax.innerHTML=padAxes.map((v,i)=>`<div><span>A${i}</span><div class="bar"><i id="rawa${i}"></i></div><b id="rawv${i}">0.00</b></div>`).join('')+padButtons.map((v,i)=>`<div><span>B${i}</span><div class="bar"><i id="rawb${i}"></i></div><b></b></div>`).join('');}
+  padAxes.forEach((v,i)=>{const e=$('rawa'+i);if(e)e.style.width=((normAxis(i)+1)/2*100).toFixed(0)+'%';const t=$('rawv'+i);if(t)t.textContent=v.toFixed(2);});
+  padButtons.forEach((v,i)=>{const e=$('rawb'+i);if(e)e.style.width=v>0.5?'100%':'0%';});
 }
-function checkGate(){
-  const g=gateObjs[gate.i]; if(!g) return;
-  const rel=st.pos.clone().sub(g.pos);const d=rel.dot(g.n);const lateral=rel.clone().addScaledVector(g.n,-d).length();
-  if((gate.lastD<0&&d>=0||gate.lastD>0&&d<=0)&&lateral<3.3){
-    if(!gate.running){gate.running=true;gate.t0=st.time;}
-    gateMeshes[gate.i].material=gateDone;if(!reduceMotion)tween(gateMeshes[gate.i],1.25,1,0.35,easeOutBack);chime();gate.i++;say('Gate '+gate.i+' of '+gateObjs.length+'.','good');
-    if(gate.i<gateObjs.length)gateMeshes[gate.i].material=gateM;
-    else{const t=st.time-gate.t0;gate.running=false;if(logbook.bestGate===null||t<logbook.bestGate)logbook.bestGate=t;save();$('winTime').textContent=t.toFixed(2);$('winBest').textContent=logbook.bestGate.toFixed(2);$('winViol').textContent=G.viol;show('winCard');}
-  }
-  gate.lastD=d;
+function updateTx(){
+  if($('txCard').hidden)return;
+  selectPad();refreshTx();
+  if(assignFn&&pad){const d=detectChange(assignBase,assignBaseB,0.5,usedSrcs(assignFn));if(d){dev.map[assignFn]={src:d.src,inv:false};saveDevices();assignFn=null;$('txHint').textContent=FUNC[assignFn]?'':'Assigned. Use Rev if it runs backwards.';refreshTx();}else if(performance.now()-assignT>8000){assignFn=null;refreshTx();}}
+  if(wiz.on)wizTick();
 }
-
-/* ---------- camera ---------- */
-const camPos=new THREE.Vector3(0,1.2,3),camLook=new THREE.Vector3();
-const FWD=new THREE.Vector3(0,0,-1);
-function cycleCam(){G.cam=G.cam==='pilot'?'chase':G.cam==='chase'?'fpv':'pilot';$('bCam').textContent='Cam: '+(G.cam==='pilot'?'Pilot':G.cam==='chase'?'Chase':'FPV');}
-function updateCamera(dt){
-  if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*14));camera.lookAt(camLook);const d=PILOT_EYE.distanceTo(st.pos);camera.fov=clamp(44*14/Math.max(d,14),7,44);camera.updateProjectionMatrix();}
-  else if(G.cam==='chase'){const target=new THREE.Vector3(0,0.5,2.2).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*5));camPos.y=Math.max(camPos.y,0.25);camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=55;camera.updateProjectionMatrix();}
-  else{camera.position.copy(new THREE.Vector3(0,0.09,-0.2).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=80;camera.updateProjectionMatrix();}
-  // trauma shake rides on top (chase and FPV only; the pilot's head does not shake)
-  if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}
-  const buffet=st.stall*0.004*(G.cam==='fpv'?1:0);if(buffet>0&&!reduceMotion){camera.rotation.z+=buffet*Math.sin(performance.now()/1000*40);}
+/* wizard */
+function startWizard(){if(!pad){$('txHint').textContent='No transmitter detected yet. Move a stick on the transmitter, then try again.';return;}
+  wiz.steps=FUNCS.filter(f=>fnAvailable(f));wiz.on=true;wiz.i=0;wiz.phase='release';wiz.base=padAxes.slice();wiz.baseB=padButtons.slice();wiz.t=performance.now();
+  ['ail','ele','thr','rud'].forEach(k=>dev.map[k]={src:null,inv:false});
+  $('wiz').hidden=false;$('fnTable').classList.add('dim');wizRender();}
+function wizRender(){const f=wiz.steps[wiz.i];if(!f){return;}
+  $('wizStep').textContent='Step '+(wiz.i+1)+' of '+wiz.steps.length;$('wizTitle').textContent=f.name;
+  const kind=f.kind;
+  if(wiz.phase==='release'){$('wizText').textContent='Let go of all sticks and leave the switches as they are.';$('wizBtns').innerHTML='';}
+  else if(wiz.phase==='detect'){$('wizText').textContent=kind==='stick'?f.dir+'.':'Flip the switch or press the button you want for '+f.name+(f.hint?' ('+f.hint+')':'')+'. '+(f.desc||'');$('wizBtns').innerHTML=kind==='stick'?'':'<button class="btn mini" id="wizSkip">Skip, not on my TX</button>';}
+  else if(wiz.phase==='verify'){$('wizText').textContent='Detected '+srcLabel(dev.map[f.id].src)+'. '+f.verify;$('wizBtns').innerHTML='<button class="btn mini primary" id="wizOk">Looks right</button><button class="btn mini" id="wizFlip">It is reversed</button><button class="btn mini" id="wizRedo">Detect again</button>';}
+  else if(wiz.phase==='sw'){$('wizText').textContent='Detected '+srcLabel(dev.map[f.id].src)+'. Flip it again and watch the bar in the table. For a switch the bar should be full when the function is ON.';$('wizBtns').innerHTML='<button class="btn mini primary" id="wizOk">Looks right</button><button class="btn mini" id="wizFlip">Reverse it</button><button class="btn mini" id="wizRedo">Detect again</button>';}
+  const ok=$('wizOk'),fl=$('wizFlip'),rd=$('wizRedo'),sk=$('wizSkip');
+  if(ok)ok.onclick=()=>wizNext();if(fl)fl.onclick=()=>{dev.map[f.id].inv=!dev.map[f.id].inv;saveDevices();refreshTx();};if(rd)rd.onclick=()=>{dev.map[f.id]={src:null,inv:false};wiz.phase='release';wiz.t=performance.now();wizRender();};if(sk)sk.onclick=()=>{dev.map[f.id]={src:null,inv:false};wizNext();};
 }
+function wizNext(){wiz.i++;if(wiz.i>=wiz.steps.length){wiz.on=false;$('wiz').hidden=true;$('fnTable').classList.remove('dim');dev.done=true;saveDevices();showPad();$('txHint').textContent='Setup complete. Everything below is live: move each control and watch the plane.';return;}wiz.phase='release';wiz.t=performance.now();wizRender();}
+function wizTick(){const f=wiz.steps[wiz.i];if(!f||!pad)return;
+  if(wiz.phase==='release'){const used=usedSrcs(null);const back=padAxes.every((v,i)=>used.has('a'+i)||Math.abs(v-wiz.base[i])<0.3)&&padButtons.every((v,i)=>used.has('b'+i)||v===wiz.baseB[i]);if((back&&performance.now()-wiz.t>400)||performance.now()-wiz.t>2500){wiz.base=padAxes.slice();wiz.baseB=padButtons.slice();wiz.phase='detect';wizRender();}return;}
+  if(wiz.phase==='detect'){const used=usedSrcs(f.id);let d=detectChange(wiz.base,wiz.baseB,f.kind==='stick'?0.5:0.4,used);if(d){
+      if(f.kind==='stick'){dev.map[f.id]={src:d.src,inv:d.sign<0};}else{dev.map[f.id]={src:d.src,inv:d.src[0]==='a'?d.sign<0:false};}
+      saveDevices();wiz.phase=f.kind==='stick'?'verify':'sw';wizRender();refreshTx();}
+    return;}
+}
+function axisOf(id){const m=dev&&dev.map[id];return m&&m.src&&m.src[0]==='a'?+m.src.slice(1):-1;}
+function onNewDevice(fresh){if(fresh){if(G.flying){say('New transmitter detected. Open Transmitter to set it up.','warn');}else{openTx(true);}}}
+function openTx(auto){G.view='hangar';show('txCard');refreshTx();if(auto&&pad&&!dev.done)startWizard();}
 
 /* ---------- sound ---------- */
 /* buses (audio-design): master <- motor, wind, alerts. Slider squared before gain. */
@@ -706,6 +808,7 @@ function updateAudio(dt){if(!audio)return;const on=G.sound&&!G.crashed&&!G.lande
   const w=clamp((st.V-6)/22,0,1);audio.wind.gain.setTargetAtTime(on?w*w*(G.cam==='fpv'?0.25:0.07):0,now,0.1);audio.windF.frequency.setTargetAtTime(300+st.V*40,now,0.1);
   audio.master.gain.setTargetAtTime(masterGain(),now,0.05);
   if(G.sound&&on&&st.volt<AC.cells*AC.alarmV&&st.amp>3){beepT+=dt;if(beepT>0.8){beepT=0;beep();}}}
+
 
 /* ---------- HUD ---------- */
 const adi=$('adi').getContext('2d'), mapc=$('map').getContext('2d');
@@ -736,7 +839,7 @@ function updateHUD(dt){
   $('hVsi').textContent=(st.vsi>=0?'+':'')+st.vsi.toFixed(1);
   $('hHdg').textContent=String(Math.round(a.hdg)%360).padStart(3,'0');
   $('hG').textContent=st.nz.toFixed(1);$('hG').className='v'+(Math.abs(st.nz)>5?' warn':'');
-  $('hThr').style.width=Math.round(st.thr*100)+'%';$('hThrV').textContent=Math.round(IN.thr*100)+'%';
+  $('hThr').style.width=Math.round(st.thr*100)+'%';$('hThrV').textContent=G.cut?'CUT':Math.round(IN.thr*100)+'%';$('hThrV').className=G.cut?'bad-t':'';
   $('hTime').textContent=fmtTime(st.airborne?st.time-G.flightStart:0);
   const vEl=$('hVolt');vEl.textContent=st.volt.toFixed(1)+' V';vEl.className='big'+(st.volt<AC.cells*AC.alarmV?' bad-t':st.volt<11.1?' no':'');
   $('hAmp').textContent=st.amp.toFixed(1)+' A';$('hMah').textContent=Math.round(st.usedAh*1000)+' mAh';
@@ -747,85 +850,129 @@ function updateHUD(dt){
   if((hudTick++&1)===0){drawADI(a);drawMap(a);}
 }
 
+
+/* ---------- screens (game-ui-ux: a screen stack, focus per screen) ---------- */
+const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard','winCard','logCard','pauseCard'];
+const SIDE=new Set(['hangarCard','txCard','preCard']);   // docked right, scene stays visible with the hangar camera
+let screenStack=[];
+function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);ov.classList.toggle('side',SIDE.has(id));document.body.classList.toggle('hangar',SIDE.has(id));G.view=SIDE.has(id)?'hangar':'fly';if(push!==false)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b)setTimeout(()=>b.focus(),30);if(id==='txCard')refreshTx();}
+function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side');document.body.classList.remove('hangar');G.view='fly';screenStack=[];}
+function back(){screenStack.pop();const prev=screenStack.pop();if(prev)show(prev);else if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.crashed)show('crashCard');else if(G.started)hide();else show('menuCard');}
+function togglePause(){if(!G.started||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.started&&!G.paused&&$('overlay').hidden&&!G.crashed&&!G.landed){G.paused=true;show('pauseCard');}});
+function fmtTime(s){s=Math.max(0,Math.floor(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+function save(){store.set('jgsim.log',logbook);}
+function saveSettings(){store.set('jgsim.settings',settings);}
+function reset(){
+  st=Sim.create();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.flying=false;kThr=0;touch.l.y=-1;$('stL').querySelector('.nub').style.transform='translate(0px,48px)';
+  MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
+  gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
+  gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
+  camPos.set(0,1.2,3);
+  if(G.started){hide();say('On the strip. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','', 'rwy',0);}else show('menuCard');
+}
+function startFlight(){G.started=true;G.flying=true;hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();say('Cleared to taxi. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s. Keep it in front of the line.','good');}
+function endFlight(kind,why){
+  const air=st.time-G.flightStart;G.flying=false;
+  logbook.flights++;logbook.airtime+=air;if(air>logbook.longest)logbook.longest=air;
+  if(kind==='crash'){logbook.crashes++;G.crashed=true;G.lastCrash=why;feedback('large',st.pos.x,Math.max(st.pos.y,0.05),st.pos.z);thud(1);$('crashWhy').textContent=why;$('crashTime').textContent=fmtTime(air);$('crashSpd').textContent=Math.round(st.maxV*3.6);$('crashAlt').textContent=st.maxAlt.toFixed(0);setTimeout(()=>{if(G.crashed)show('crashCard');},reduceMotion?0:650);if(audio)audio.motor.gain.setTargetAtTime(0,audio.ctx.currentTime,0.05);}
+  else{G.landed=true;const td=st.touchdown||{sink:0,speed:0};let grade='Greaser.';if(td.sink>1.8){grade='Hard landing, but it lives.';logbook.hard++;}else if(td.sink>1.0){grade='Firm landing.';logbook.firm++;}else logbook.landings++;$('landWhy').textContent=grade+' Touched down at '+(td.speed*3.6).toFixed(0)+' km/h, sink '+td.sink.toFixed(1)+' m/s.';$('landTime').textContent=fmtTime(air);$('landSink').textContent=td.sink.toFixed(1);$('landViol').textContent=G.viol;show('landCard');}
+  save();
+}
+function checkGate(){
+  const g=gateObjs[gate.i]; if(!g) return;
+  const rel=st.pos.clone().sub(g.pos);const d=rel.dot(g.n);const lateral=rel.clone().addScaledVector(g.n,-d).length();
+  if((gate.lastD<0&&d>=0||gate.lastD>0&&d<=0)&&lateral<3.3){
+    if(!gate.running){gate.running=true;gate.t0=st.time;}
+    gateMeshes[gate.i].material=gateDone;if(!reduceMotion)tween(gateMeshes[gate.i],1.25,1,0.35,easeOutBack);chime();gate.i++;say('Gate '+gate.i+' of '+gateObjs.length+'.','good');
+    if(gate.i<gateObjs.length)gateMeshes[gate.i].material=gateM;
+    else{const t=st.time-gate.t0;gate.running=false;if(logbook.bestGate===null||t<logbook.bestGate)logbook.bestGate=t;save();$('winTime').textContent=t.toFixed(2);$('winBest').textContent=logbook.bestGate.toFixed(2);$('winViol').textContent=G.viol;show('winCard');}
+  }
+  gate.lastD=d;
+}
+
+/* ---------- camera (camera-systems): pilot, chase, FPV, hangar ---------- */
+const camPos=new THREE.Vector3(0,1.2,3),camLook=new THREE.Vector3();
+const FWD=new THREE.Vector3(0,0,-1);
+let hangarAngle=0;
+function cycleCam(){G.cam=G.cam==='pilot'?'chase':G.cam==='chase'?'fpv':'pilot';$('bCam').textContent='Cam: '+(G.cam==='pilot'?'Pilot':G.cam==='chase'?'Chase':'FPV');}
+function updateCamera(dt){
+  if(G.view==='hangar'){hangarAngle+=dt*0.12;const a=-0.9+Math.sin(hangarAngle)*0.35;const target=st.pos.clone().add(new THREE.Vector3(0,0.02,0));const want=new THREE.Vector3(Math.sin(a)*1.9,0.55,Math.cos(a)*1.9).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=38;const W=canvas.clientWidth,H=canvas.clientHeight;if(W>620)camera.setViewOffset(W,H,W*0.24,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
+  if(camera.view&&camera.view.enabled)camera.clearViewOffset();
+  if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*14));camera.lookAt(camLook);const d=PILOT_EYE.distanceTo(st.pos);camera.fov=clamp(44*14/Math.max(d,14),7,44);camera.updateProjectionMatrix();}
+  else if(G.cam==='chase'){const target=new THREE.Vector3(0,0.5,2.2).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*5));camPos.y=Math.max(camPos.y,0.25);camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=55;camera.updateProjectionMatrix();}
+  else{camera.position.copy(new THREE.Vector3(0,0.09,-0.2).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=80;camera.updateProjectionMatrix();}
+  if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}
+  const buffet=st.stall*0.004*(G.cam==='fpv'?1:0);if(buffet>0&&!reduceMotion){camera.rotation.z+=buffet*Math.sin(performance.now()/1000*40);}
+}
+
 /* ---------- preflight ---------- */
 function updatePreflight(){
   if($('preCard').hidden)return;
   const p=G.preflight;
-  $('pf-thr-v').textContent=Math.round(IN.thr*100)+'%';$('pf-thr').classList.toggle('done',IN.thr<0.05);
+  $('pf-thr-v').textContent=Math.round(IN.rawThr*100)+'%';$('pf-thr').classList.toggle('done',IN.rawThr<0.05);
   if(IN.rawAil>0.7)p.ail=true;if(IN.rawEle>0.7)p.ele=true;if(IN.rawRud>0.7)p.rud=true;
   $('pf-ail').classList.toggle('done',p.ail);$('pf-ele').classList.toggle('done',p.ele);$('pf-rud').classList.toggle('done',p.rud);
   $('pf-wind-v').textContent=settings.wdir+'° at '+settings.wind+' m/s, RWY 00';
   $('pf-wind').classList.toggle('done',p.wind);
-  const all=IN.thr<0.05&&p.ail&&p.ele&&p.rud;$('bClear').disabled=!all;
+  $('pf-tx-v').textContent=pad?(dev&&dev.done?'mapped':'needs setup'):'keyboard or touch';$('pf-tx').classList.toggle('done',!pad||(dev&&dev.done));
+  const all=IN.rawThr<0.05&&p.ail&&p.ele&&p.rud&&(!pad||(dev&&dev.done));$('bClear').disabled=!all;
 }
 $('pf-wind').addEventListener('click',()=>{G.preflight.wind=true;});
-$('pf-wind').style.cursor='pointer';
 
-/* ---------- drawer ---------- */
-const CH=[['ail','Aileron'],['ele','Elevator'],['thr','Throttle'],['rud','Rudder'],['sw','Rates sw']];
-function buildDrawer(){
-  CH.forEach(([k,name])=>{const el=$('ch-'+k);el.innerHTML=`<span>${name}</span><div class="bar"><i id="bar-${k}"></i></div><button class="btn mini" data-assign="${k}">Axis ${map[k].axis}</button><button class="btn mini" data-inv="${k}">Inv</button>`+(k==='thr'||k==='sw'?'<span></span>':`<span class="trim"><button class="btn mini" data-trim="${k}" data-d="-1">−</button><b id="trim-${k}">0</b><button class="btn mini" data-trim="${k}" data-d="1">+</button></span>`);});
-  $('drawer').addEventListener('click',e=>{const a=e.target.closest('[data-assign]'),i=e.target.closest('[data-inv]'),t=e.target.closest('[data-trim]');
-    if(a)startAssign(a.dataset.assign,a);
-    if(i){map[i.dataset.inv].inv=!map[i.dataset.inv].inv;store.set('jgsim.map',map);refreshInv();}
-    if(t){const k=t.dataset.trim;trims[k]=clamp(Math.round((trims[k]+0.02*(+t.dataset.d))*100)/100,-0.3,0.3);store.set('jgsim.trims',trims);refreshInv();}});
-  refreshInv();
-}
-function refreshInv(){CH.forEach(([k])=>{const b=$('drawer').querySelector(`[data-inv="${k}"]`);b.classList.toggle('on',!!map[k].inv);$('drawer').querySelector(`[data-assign="${k}"]`).textContent=map[k].axis<0?'Assign':'Axis '+map[k].axis;const tr=$('trim-'+k);if(tr)tr.textContent=(trims[k]>0?'+':'')+Math.round(trims[k]*50);});}
-function startAssign(k,btn){if(!pollPad()){$('padName').textContent='No gamepad detected yet. Move a stick on the transmitter, then try again.';return;}assigning=k;assignBase=padAxes.slice();assignT=performance.now();btn.textContent='Move it…';}
-// wizard: 4 steps, detects axis and direction
-const WIZ=[['ail','Aileron','Move the RIGHT stick fully to the RIGHT, then let go.'],['ele','Elevator','Pull the RIGHT stick fully BACK (towards you), then let go.'],['thr','Throttle','Push the LEFT stick fully UP, then bring it back down.'],['rud','Rudder','Move the LEFT stick fully to the RIGHT, then let go.']];
-let wiz=null;
-function startWizard(){if(!pollPad()){$('padName').textContent='No gamepad detected yet. Move a stick on the transmitter, then try again.';return;}wiz={i:0,base:padAxes.slice(),t:performance.now()};$('wiz').hidden=false;wizShow();}
-function wizShow(){const s=WIZ[wiz.i];$('wizText').textContent='Step '+(wiz.i+1)+' of 4: '+s[1];$('wizSub').textContent=s[2];}
-function wizUpdate(){if(!wiz||!pad)return;let best=-1,bd=0.5,sign=0;padAxes.forEach((v,i)=>{const d=v-wiz.base[i];if(Math.abs(d)>bd){bd=Math.abs(d);best=i;sign=Math.sign(d);}});
-  if(best>=0){const k=WIZ[wiz.i][0];map[k].axis=best;map[k].inv=sign<0;store.set('jgsim.map',map);refreshInv();wiz.i++;wiz.t=performance.now();wiz.waitRelease=true;if(wiz.i>=WIZ.length){wiz=null;$('wiz').hidden=true;$('padName').textContent=pad.id.slice(0,60)+' · mapped. Check each surface on the plane.';return;}wizShow();}}
-function updateDrawer(){
-  if($('drawer').hidden)return;
-  if(pollPad()){$('padName').textContent=pad.id.slice(0,60)+' · '+padAxes.length+' axes';}
-  const ax=$('axes');if(ax.childElementCount!==padAxes.length){ax.innerHTML=padAxes.map((v,i)=>`<div><span>${i}</span><div class="bar"><i id="ax${i}"></i></div></div>`).join('');}
-  padAxes.forEach((v,i)=>{const e=$('ax'+i);if(e)e.style.width=((normAxis(i)+1)/2*100).toFixed(0)+'%';});
-  CH.forEach(([k])=>{let v=k==='thr'?IN.thr*2-1:k==='sw'?(G.lowRate?1:-1):IN[k];const e=$('bar-'+k);if(e)e.style.width=(((v+1)/2)*100).toFixed(0)+'%';});
-  if(assigning&&assignBase){let best=-1,bd=0.45;padAxes.forEach((v,i)=>{const d=Math.abs(v-assignBase[i]);if(d>bd){bd=d;best=i;}});if(best>=0){map[assigning].axis=best;store.set('jgsim.map',map);assigning=null;refreshInv();}else if(performance.now()-assignT>6000){assigning=null;refreshInv();}}
-  if(wiz){if(wiz.waitRelease){const back=padAxes.every((v,i)=>Math.abs(v-wiz.base[i])<0.3);if(back||performance.now()-wiz.t>4000){wiz.waitRelease=false;wiz.base=padAxes.slice();}}else wizUpdate();}
-  if(++calDirty>120){calDirty=0;store.set('jgsim.cal',cal);}
-}
+/* ---------- hangar ---------- */
+function showHangar(){$('sheet').innerHTML=SHEET.map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join('');show('hangarCard');}
 
-/* ---------- UI wiring ---------- */
-$('bPreflight').addEventListener('click',()=>{G.started=true;if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();show('preCard');});
-$('bSetup').addEventListener('click',()=>{startFlight();$('drawer').hidden=false;});
-$('bTouch').addEventListener('click',()=>{setSticks(true);startFlight();});
+/* ---------- telemetry overlay modes ---------- */
+const TELE=['full','minimal','off'];
+function cycleTelemetry(){settings.tele=TELE[(TELE.indexOf(settings.tele||'full')+1)%3];applyTelemetry();saveSettings();}
+function applyTelemetry(){const m=settings.tele||'full';$('hud').classList.toggle('minimal',m==='minimal');$('hud').classList.toggle('hidden',m==='off');$('bTele').textContent='Telemetry: '+m;}
+
+/* ---------- logbook ---------- */
+function showLog(){const L=logbook;$('logStats').innerHTML=[['Flights',L.flights],['Airtime',fmtTime(L.airtime)],['Longest',fmtTime(L.longest)],['Greasers',L.landings],['Firm',L.firm],['Hard',L.hard],['Crashes',L.crashes],['Violations',L.violations],['Best course',L.bestGate===null?'none':L.bestGate.toFixed(1)+' s']].map(([k,v])=>`<div><span class="lbl">${k}</span><b>${v}</b></div>`).join('');show('logCard');}
+
+/* ---------- wiring ---------- */
+$('bFly').addEventListener('click',()=>{G.started=true;if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();show('preCard');});
+$('bHangar').addEventListener('click',showHangar);
+$('bMenuTx').addEventListener('click',()=>openTx(false));
+$('bMenuLog').addEventListener('click',showLog);
+$('bTouch').addEventListener('click',()=>{setSticks(true);G.started=true;startFlight();});
+$('bMenuSettings').addEventListener('click',()=>{$('drawer').hidden=false;});
+$('bHangarFly').addEventListener('click',()=>{G.started=true;show('preCard');});
+$('bHangarBack').addEventListener('click',back);
+$('bTxWizard').addEventListener('click',startWizard);
+$('bTxBack').addEventListener('click',()=>{wiz.on=false;$('wiz').hidden=true;$('fnTable').classList.remove('dim');back();});
 $('bClear').addEventListener('click',startFlight);
 $('bSkipPre').addEventListener('click',startFlight);
-$('bPreTx').addEventListener('click',()=>{$('drawer').hidden=false;});
+$('bPreTx').addEventListener('click',()=>openTx(false));
 $('bAgain').addEventListener('click',reset);
 $('bLandAgain').addEventListener('click',reset);
 $('bLandLog').addEventListener('click',showLog);
 $('bWinGo').addEventListener('click',hide);
 $('bWinAgain').addEventListener('click',reset);
-$('bPause').addEventListener('click',togglePause);$('bResume').addEventListener('click',togglePause);$('bPauseTx').addEventListener('click',()=>{$('drawer').hidden=false;});$('bPauseLog').addEventListener('click',showLog);$('bPauseReset').addEventListener('click',reset);
 $('bCam').addEventListener('click',cycleCam);
+$('bTele').addEventListener('click',cycleTelemetry);
 $('bMode').addEventListener('click',()=>{G.mode=G.mode==='free'?'gates':'free';$('bMode').textContent=G.mode==='free'?'Freefly':'Gates';reset();});
 $('bSound').addEventListener('click',()=>{if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();G.sound=!G.sound;$('bSound').textContent='Sound '+(G.sound?'on':'off');});
-$('bTx').addEventListener('click',()=>{$('drawer').hidden=false;});
-$('bClose').addEventListener('click',()=>{$('drawer').hidden=true;wiz=null;$('wiz').hidden=true;});
-$('bWizard').addEventListener('click',startWizard);
-$('bWizCancel').addEventListener('click',()=>{wiz=null;$('wiz').hidden=true;});
-$('bCal').addEventListener('click',()=>{cal={};store.set('jgsim.cal',cal);});
-$('bTrim0').addEventListener('click',()=>{trims.ail=trims.ele=trims.rud=0;store.set('jgsim.trims',trims);refreshInv();});
-$('bLog').addEventListener('click',showLog);
-$('bLogClose').addEventListener('click',()=>{if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.started)hide();else show('startCard');});
+$('bPause').addEventListener('click',togglePause);$('bResume').addEventListener('click',togglePause);
+$('bPauseTx').addEventListener('click',()=>openTx(false));$('bPauseLog').addEventListener('click',showLog);$('bPauseReset').addEventListener('click',reset);$('bPauseMenu').addEventListener('click',()=>{G.started=false;G.paused=false;G.flying=false;reset();});
+$('bTx').addEventListener('click',()=>openTx(false));
+$('bClose').addEventListener('click',()=>{$('drawer').hidden=true;});
+$('bTrim0').addEventListener('click',()=>{trims.ail=trims.ele=trims.rud=0;store.set('jgsim.trims',trims);refreshTrims();});
+$('bLogClose').addEventListener('click',back);
 $('bLogClear').addEventListener('click',()=>{Object.assign(logbook,{flights:0,airtime:0,landings:0,firm:0,hard:0,crashes:0,violations:0,longest:0,bestGate:null});save();showLog();});
-function showLog(){const L=logbook;$('logStats').innerHTML=[['Flights',L.flights],['Airtime',fmtTime(L.airtime)],['Longest',fmtTime(L.longest)],['Greasers',L.landings],['Firm',L.firm],['Hard',L.hard],['Crashes',L.crashes],['Violations',L.violations],['Best course',L.bestGate===null?'none':L.bestGate.toFixed(1)+' s']].map(([k,v])=>`<div><span class="lbl">${k}</span><b>${v}</b></div>`).join('');show('logCard');}
+$('trims').addEventListener('click',e=>{const t=e.target.closest('[data-trim]');if(!t)return;const k=t.dataset.trim;trims[k]=clamp(Math.round((trims[k]+0.02*(+t.dataset.d))*100)/100,-0.3,0.3);store.set('jgsim.trims',trims);refreshTrims();});
+function refreshTrims(){['ail','ele','rud'].forEach(k=>{$('trim-'+k).textContent=(trims[k]>0?'+':'')+Math.round(trims[k]*50);});}
 const bind=(id,key,out,fmt)=>{const el=$(id);el.value=settings[key];$(out).textContent=fmt(settings[key]);el.addEventListener('input',e=>{settings[key]=+e.target.value;$(out).textContent=fmt(settings[key]);saveSettings();});};
 bind('sRates','rates','oRates',v=>v+'%');bind('sExpo','expo','oExpo',v=>v+'%');bind('sLow','low','oLow',v=>v+'%');bind('sVol','vol','oVol',v=>v+'%');bind('sWind','wind','oWind',v=>v+' m/s');bind('sWdir','wdir','oWdir',v=>v+'°');bind('sGust','gust','oGust',v=>v+'%');
 $('cShadow').checked=settings.shadow;
 $('cSticks').addEventListener('change',e=>setSticks(e.target.checked));
 $('cShadow').addEventListener('change',e=>{settings.shadow=e.target.checked;renderer.shadowMap.enabled=settings.shadow;scene.traverse(o=>{if(o.material)o.material.needsUpdate=true;});saveSettings();});
-buildDrawer();
+buildTx();refreshTrims();applyTelemetry();
 const coarse=matchMedia('(pointer:coarse)').matches&&!matchMedia('(min-width:900px)').matches;
 if(settings.sticks||coarse)setSticks(true);
 $('cSticks').checked=settings.sticks;
+
 
 /* ---------- loop ---------- */
 function resize(){const w=canvas.clientWidth,h=canvas.clientHeight,pr=renderer.getPixelRatio();if(canvas.width!==Math.floor(w*pr)||canvas.height!==Math.floor(h*pr)){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}}
@@ -837,7 +984,7 @@ function frame(now){
   if(!isFinite(st.pos.x)){say('Sim state reset after a numeric fault.','warn');reset();}
   readInput();
   const has=!!pad;if(padShown!==has){padShown=has;showPad();}
-  updatePreflight();
+  updatePreflight();updateTx();
   adaptResolution(dt);updateParticles(dt);updateTweens(dt);
   const live=G.started&&!G.crashed&&!G.landed&&!G.paused&&$('overlay').hidden;
   if(live){
@@ -860,15 +1007,16 @@ function frame(now){
     }
   }
   plane.position.copy(st.pos);plane.quaternion.copy(st.q);
-  propBlade.rotation.z=st.propAngle;prop.material.opacity=clamp(st.thr*0.5,0,0.4);
-  surf.ailL.rotation.x=IN.ail*0.45;surf.ailR.rotation.x=-IN.ail*0.45;surf.elev.rotation.x=IN.ele*0.45;surf.rudd.rotation.y=-IN.rud*0.5;
+  if(G.view==='hangar'&&!G.started){st.propAngle+=IN.thr*40*dt;}
+  propBlade.rotation.z=st.propAngle;prop.material.opacity=clamp((live?st.thr:IN.thr)*0.5,0,0.4);
+  animateSurfaces(IN);
   sockArm.rotation.y=-settings.wdir*Math.PI/180+Math.PI/2+Math.PI;cone.rotation.x=0;sockArm.rotation.z=-clamp(0.9-settings.wind*0.14,0,0.9);
   sun.target.position.copy(st.pos);sun.position.copy(st.pos).add(new THREE.Vector3(-60,90,-40));
-  updateCamera(dt);updateHUD(dt);updateAudio(dt);updateDrawer();
+  updateCamera(dt);updateHUD(dt);updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={get st(){return st},G,IN,settings};
-reset();show('startCard');showPad();
+window.JG={get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+reset();show('menuCard');showPad();
 requestAnimationFrame(frame);
 })();
 </script>

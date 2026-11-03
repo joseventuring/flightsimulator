@@ -5,7 +5,7 @@ const Sim=(function(THREE){
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V3=THREE.Vector3;
 const AC={
-  name:'CraycleCub V2', mass:0.62, span:0.80, chord:0.19, S:0.152, AR:4.2, e:0.80,
+  name:'CraycleCub V2', mass:0.62, features:{flaps:false,gear:false}, flapCL:0.9, flapCD:0.06, flapCm:-0.25, span:0.80, chord:0.19, S:0.152, AR:4.2, e:0.80,
   wingPos:new V3(0,0.03,0.004), incidence:0.026, CL0:0.25, CLa:4.3, aStall:0.245, stallW:0.035, CD0:0.055, Cm0:-0.035,
   St:0.026, tailPos:new V3(0,0.01,0.30), CLat:3.4, tauE:0.55, deMax:0.38, dEps:0.35, aStallT:0.30, tailWash:0.4, tailInc:-0.012,
   Sf:0.014, finPos:new V3(0,0.07,0.28), CLaf:2.6, tauR:0.55, drMax:0.52, finWash:0.4,
@@ -54,17 +54,18 @@ function step(st,inp,dt,env){
   const n=Math.hypot(ex,ez)||1; const lx=ez/n, lz=-ex/n; // lift direction (perp to flow, in symmetry plane)
   const qd=0.5*rho*V*V;
   // wing
+  const df=inp.flap||0; // flap deflection, rad
   const aw=alpha+AC.incidence;
   const sig=1/(1+Math.exp(-(Math.abs(aw)-AC.aStall)/AC.stallW));
   const hb=clamp((st.pos.y-0.1)/AC.span,0,10), ge=Math.exp(-4*hb);
-  let CL=((1-sig)*(AC.CL0+AC.CLa*aw)+sig*Math.sin(2*aw))*(1+0.06*ge);
-  const CD=AC.CD0+CL*CL/(Math.PI*AC.AR*AC.e)*(1-0.55*ge)+sig*1.4*Math.sin(aw)*Math.sin(aw)+(st.thr<0.05?0.012:0);
+  let CL=((1-sig)*(AC.CL0+AC.flapCL*df+AC.CLa*aw)+sig*Math.sin(2*aw))*(1+0.06*ge);
+  const CD=AC.CD0+AC.flapCD*df*df*6+CL*CL/(Math.PI*AC.AR*AC.e)*(1-0.55*ge)+sig*1.4*Math.sin(aw)*Math.sin(aw)+(st.thr<0.05?0.012:0);
   const L=qd*AC.S*CL, D=qd*AC.S*CD;
   let FX=L*lx-D*ex, FY=-D*ey+qd*AC.S*AC.CYb*beta, FZ=L*lz-D*ez;
   let Lm=0,Mm=0,Nm=0;
   { const rx=-AC.wingPos.z, ry=AC.wingPos.x, rz=-AC.wingPos.y;
     Lm+=ry*FZ-rz*FY; Mm+=rz*FX-rx*FZ; Nm+=rx*FY-ry*FX; }
-  Mm+=qd*AC.S*AC.chord*AC.Cm0;
+  Mm+=qd*AC.S*AC.chord*(AC.Cm0+AC.flapCm*df);
   // horizontal tail (in slipstream)
   const uT=Math.sqrt(Math.max(u,0)*Math.max(u,0)+AC.tailWash*slip2), Vt2=uT*uT+v*v+wv*wv, Vt=Math.sqrt(Vt2), lt=AC.tailPos.z;
   let at=(Vt>0.5?Math.atan2(wv*(1-AC.dEps),Math.max(uT,0.1)):0)+AC.tailInc-AC.tauE*inp.ele*AC.deMax+(Vt>1?q*lt/Vt:0);

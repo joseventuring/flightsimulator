@@ -1,4 +1,4 @@
-# JG Flight Sim audit, v0.1 to v0.3 (3 to 4 Nov 2026)
+# JG Flight Sim audit, v0.1 to v0.4 (3 to 4 Nov 2026)
 
 Scores are my own, 0 to 100, against what a practice simulator for the CraycleCub V2 needs. Evidence is the Node harness (`npm test`) and headless Chrome runs against the live page with a simulated 5-axis PPM controller matching JJ's cable.
 
@@ -29,3 +29,16 @@ v0.3 (4 Nov 2026) applied the awesome-gamedev-agent-skills pack: pause on hidden
 4. Takeoff: full throttle, hold a touch of right rudder, let the tail rise, lift off at about 45 km/h, ease the pull. Climb to 30 m before turning.
 5. Fly in front of the line, under 120 m, inside 300 m.
 6. Landing: throttle to about 25%, hold 36 to 40 km/h, aim at the numbers, throttle off over the threshold, flare to a sink under 1 m/s.
+
+
+## v0.4 (4 Nov 2026): from JJ's first real flights
+
+Reported: rudder dead, elevator reversed, elevator surface on the model moving the wrong way. Root causes and fixes:
+
+1. Control surfaces were hinged at their centre and rotated with the wrong sign, so pull showed the elevator going down while the physics pitched up. Now each surface is a hinge group at its real hinge line with signs verified against the geometry (comment in `src/mesh.js`). Rudder was mirrored too.
+2. The default mapping assumed rudder on axis 3. On JJ's PPM cable the rudder is most likely axis 4 (axis 3 sat at exactly 0.00000 in the hardware tester, the stick axes jitter). The sim no longer assumes anything: a new transmitter opens the setup screen and runs the guided setup, which detects every axis and button, maps the four sticks with a live direction check against the 3D plane, then offers switches and buttons for dual rates, throttle cut, camera and reset (flaps and gear when the aircraft has them).
+3. Bindings are saved per device id, calibration is automatic min/max, and the preflight will not clear until the transmitter is mapped and each surface has been exercised.
+
+Also new: Hangar screen with the CraycleCub V2 data sheet the model is tuned to, flap physics in the core (for aircraft that have them), telemetry overlay full/minimal/off (T), main menu, screen stack with Back. Source split into `src/*.js` modules stitched by `build.py`.
+
+Scores: transmitter 96 to 97 (verified end to end in a headless run with a reversed elevator and rudder on axis 4), visual design 91 to 92 (hinged surfaces), code quality 91 to 93 (modules). Average 93.0.

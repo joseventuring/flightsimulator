@@ -8,6 +8,10 @@ sim_core = re.search(r'/\*SIM-BEGIN\*/(.*?)/\*SIM-END\*/', sim, re.S).group(1)
 sim_core = sim_core.replace("(typeof THREE!=='undefined'?THREE:require('three'))", "(THREE)")
 sim_core = re.sub(r"\(typeof THREE!=='undefined'\?THREE:require\('[^']*'\)\)", "(THREE)", sim_core)
 app = tpl.replace('/*__SIM__*/', sim_core)
+for name in ['scene','mesh','fx','world','audio','hud','input','txsetup','flow']:
+    f = root / 'src' / (name + '.js')
+    if f.exists():
+        app = app.replace('/*__' + name.upper() + '__*/', f.read_text())
 assert '—' not in app and '–' not in app, 'dash found'
 (root / 'app.html').write_text(app)
 page = app.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '')

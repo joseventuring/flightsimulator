@@ -88,7 +88,7 @@ function readInput(){
   if(settings.sticks||touching){if(a===null)a=touch.r.x;if(e===null)e=-touch.r.y;if(r===null)r=touch.l.x;if(t===null)t=(touch.l.y+1)/2;if(src==='keyboard')src='touch';}
   // keyboard fills anything still unmapped
   let ka=0,ke=0,kr=0;if(keys.ArrowLeft)ka=-1;if(keys.ArrowRight)ka=1;if(keys.ArrowDown)ke=1;if(keys.ArrowUp)ke=-1;if(keys.KeyA)kr=-1;if(keys.KeyD)kr=1;
-  if(keys.KeyW)kThr=clamp(kThr+0.012,0,1);if(keys.KeyS)kThr=clamp(kThr-0.012,0,1);
+  const nowIn=performance.now(),dIn=clamp((nowIn-(readInput.t||nowIn))/1000,0,0.1);readInput.t=nowIn;if(keys.KeyW)kThr=clamp(kThr+0.7*dIn,0,1);if(keys.KeyS)kThr=clamp(kThr-0.7*dIn,0,1);
   if(a===null||ka)a=a===null?ka:a+ka; if(e===null||ke)e=e===null?ke:e+ke; if(r===null||kr)r=r===null?kr:r+kr; if(t===null)t=kThr;
   a=clamp(a,-1,1);e=clamp(e,-1,1);r=clamp(r,-1,1);
   const dead=0.04;const mag=Math.hypot(a,e);if(mag<dead){a=0;e=0;}else{const sc=Math.min((mag-dead)/(1-dead),1)/mag;a*=sc;e*=sc;}

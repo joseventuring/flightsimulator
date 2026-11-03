@@ -62,3 +62,11 @@ JJ reported: flight not running, options not clickable (Reverse did nothing, no 
 New for the phone: landscape layout with sticks in the corners (throttle stays where you leave it, rudder and right stick spring back), readout strip, Self-level / Assist / Off stabiliser (default Self-level on phone), model marker ring and stronger zoom when the plane is far, fullscreen and landscape lock on Fly, rotate prompt in portrait, vibration on touchdown and crash, add-to-home-screen manifest, lighter rendering on mobile.
 
 Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 90 (first version, awaiting JJ's hands-on), aircraft visuals 88 (procedural, the real STL mesh would take it past 95), UI 92, robustness 94.
+
+## v0.6 (4 Nov 2026): camera and world, after JJ's first phone flights
+
+- Pilot camera zoomed to about 4 degrees to keep the model large, which removed the horizon and turned the world into green blobs; the marker ring scaled with the zoom. Now: auto-zoom keeps the model near 1/6 of the screen but never narrower than 18 deg (phone) or 15 deg (desktop), eased so it never jumps; marker is a constant 5 to 7% of the view and only shows when the model is too small to read.
+- World: sky with sun disc and glow matching the shadow light, exponential haze, rolling terrain flat to 380 m then foothills and ridgelines with collision, coconut palms and rubber trees around the field (instanced, with collision), plantation rows on the hills, mowed stripes, textured strip with tyre ruts, shed, canopy, car, windsock.
+- Keyboard throttle was frame-rate dependent; now time-based.
+- Budget: about 60 draw calls, 80k triangles on phone with shadows off by default; 150k on desktop with shadows.
+- Regression: TX wizard 8/8, surface directions 3/3, phone touch flight, physics harness unchanged.

@@ -51,12 +51,20 @@ let hangarAngle=0;
 const CAMS=['pilot','chase','fpv'],CAMN={pilot:'Pilot',chase:'Chase',fpv:'FPV'};
 function cycleCam(){G.cam=CAMS[(CAMS.indexOf(G.cam)+1)%3];document.querySelectorAll('[data-cam]').forEach(b=>b.textContent=CAMN[G.cam]);}
 /* model marker: constant-size ring when the model is far, a standard aid in RC sims */
-const marker=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.strokeStyle='#F26522';g.lineWidth=5;g.beginPath();g.arc(32,32,24,0,Math.PI*2);g.stroke();const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),sizeAttenuation:false,depthTest:false,transparent:true,opacity:0.8}));sp.scale.set(0.028,0.028,1);sp.material.map.minFilter=THREE.LinearFilter;sp.renderOrder=10;scene.add(sp);return sp;})();
-function updateMarker(){const d=camera.position.distanceTo(st.pos);marker.position.copy(st.pos);marker.visible=G.flying&&G.view==='fly'&&G.cam!=='fpv'&&d>(MOBILE?35:60);marker.material.opacity=clamp((d-(MOBILE?35:60))/40,0,0.8);}
+const marker=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='#F26522';g.lineWidth=7;g.beginPath();g.arc(64,64,52,0,Math.PI*2);g.stroke();
+  const t=new THREE.CanvasTexture(c);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true,opacity:0.85,fog:false}));sp.renderOrder=10;scene.add(sp);return sp;})();
+/* marker: constant screen size (5% of the view height), shown only when the model is too small to read */
+function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2*d*Math.tan(camera.fov*Math.PI/360);const modelFrac=0.8/viewH;
+  marker.position.copy(st.pos);const sz=viewH*(MOBILE?0.075:0.055);marker.scale.set(sz,sz,1);
+  marker.visible=G.flying&&G.view==='fly'&&G.cam==='pilot'&&modelFrac<0.06;marker.material.opacity=clamp((0.06-modelFrac)/0.03,0,0.85);}
 function updateCamera(dt){
   if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const want=new THREE.Vector3(Math.sin(a)*1.35,0.62,Math.cos(a)*1.35).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
   if(camera.view&&camera.view.enabled)camera.clearViewOffset();
-  if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*14));camera.lookAt(camLook);const d=PILOT_EYE.distanceTo(st.pos);const base=MOBILE?40:44;const span=MOBILE?7:9;/* keep the model about 1/span of the screen height, like a pilot's eyes would */camera.fov=clamp(2*Math.atan(0.8*span/2/Math.max(d,1))*57.3,MOBILE?4:5,base);camera.updateProjectionMatrix();}
+  if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*12));camera.lookAt(camLook);
+    /* Auto-zoom like RealFlight: keep the model readable but never zoom so far that the horizon and field drop out of view.
+       Model fills about 1/6 of the screen height when it can; the lens never goes narrower than 18 deg (phone) or 15 deg (desktop). */
+    const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(0.8*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
+    camera.fov+=(want-camera.fov)*(1-Math.exp(-dt*3));camera.updateProjectionMatrix();}
   else if(G.cam==='chase'){const target=new THREE.Vector3(0,0.45,2.0).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*5));camPos.y=Math.max(camPos.y,0.25);camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
   else{camera.position.copy(new THREE.Vector3(0,0.1,-0.19).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
   if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}

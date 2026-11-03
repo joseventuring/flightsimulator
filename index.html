@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 html,body{height:100%;margin:0}
+[hidden]{display:none!important}
 
 /* Layout: full-bleed 3D field; instrument strip top-left, mode and camera dock bottom, transmitter drawer slides over from the right. One dark world, no light theme. */
 :root{
@@ -78,7 +79,7 @@ button{font:inherit;color:inherit}
 .ch .ax{color:var(--muted);font-size:12px}
 .mini{padding:4px 10px;min-height:32px;font-size:13px}
 .axes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;font-family:var(--mono);font-size:12px}
-.axes div{display:grid;grid-template-columns:26px 1fr;gap:6px;align-items:center;color:var(--muted)}
+.axes>div{display:grid;grid-template-columns:26px 1fr;gap:6px;align-items:center;color:var(--muted)}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .sl{display:grid;grid-template-columns:90px 1fr 48px;gap:10px;align-items:center;font-family:var(--mono);font-size:13px}
 .sl output{text-align:right;color:var(--muted)}
@@ -239,7 +240,7 @@ for(let i=0;i<14;i++)tree(-26+rnd()*4,-70+i*9,4+rnd()*4);
 const hangar=new THREE.Mesh(new THREE.BoxGeometry(10,4,8),new THREE.MeshLambertMaterial({color:0x2A3440}));hangar.position.set(16,2,8);hangar.castShadow=hangar.receiveShadow=true;scene.add(hangar);
 const roof=new THREE.Mesh(new THREE.BoxGeometry(10.6,0.3,8.6),new THREE.MeshLambertMaterial({color:0xF26522}));roof.position.set(16,4.1,8);roof.castShadow=true;scene.add(roof);
 // pilot marker
-const pilot=new THREE.Group();pilot.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.4,8),new THREE.MeshLambertMaterial({color:0x2A3440})),{position:new THREE.Vector3(0,0.7,0)}));pilot.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),new THREE.MeshLambertMaterial({color:0xd9a77a})),{position:new THREE.Vector3(0,1.55,0)}));pilot.position.set(2.5,0,4);pilot.traverse(o=>o.castShadow=true);scene.add(pilot);
+const pilot=new THREE.Group();const pBody=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.2,1.4,8),new THREE.MeshLambertMaterial({color:0x2A3440}));pBody.position.y=0.7;pilot.add(pBody);const pHead=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),new THREE.MeshLambertMaterial({color:0xd9a77a}));pHead.position.y=1.55;pilot.add(pHead);pilot.position.set(2.5,0,4);pilot.traverse(o=>o.castShadow=true);scene.add(pilot);
 const PILOT_EYE=new THREE.Vector3(2.5,1.65,4);
 
 /* ---------- plane mesh (JG colour plan: black airframe, white nose/tail/tips) ---------- */
@@ -298,7 +299,7 @@ function setSticks(on){settings.sticks=on;$('sticks').classList.toggle('show',on
 function readInput(){
   const ex=settings.expo/100, rt=settings.rates/100;
   let a=0,e=0,r=0,t=null,src='keyboard';
-  if(pollPad()){const va=axisVal('ail'),ve=axisVal('ele'),vr=axisVal('rud'),vt=axisVal('thr');if(va!==null)a=va;if(ve!==null)e=ve;if(vr!==null)r=vr;if(vt!==null)t=(-vt+1)/2;src='transmitter';}
+  if(pollPad()){const va=axisVal('ail'),ve=axisVal('ele'),vr=axisVal('rud'),vt=axisVal('thr');if(va!==null)a=va;if(ve!==null)e=ve;if(vr!==null)r=vr;if(vt!==null)t=(vt+1)/2;src='transmitter';}
   const touching=touch.l.id!==null||touch.r.id!==null;
   if(touching){a=touch.r.x;e=-touch.r.y;r=touch.l.x;t=(touch.l.y+1)/2;src='touch';}
   else if(src==='keyboard'){
@@ -528,7 +529,7 @@ buildDrawer();
 const coarse=matchMedia('(pointer:coarse)').matches&&!matchMedia('(min-width:900px)').matches;
 if(settings.sticks||coarse)setSticks(true);
 $('cSticks').checked=settings.sticks;
-window.addEventListener('gamepaddisconnected',()=>{pad=null;padShown=false;showPad();});
+window.addEventListener('gamepaddisconnected',()=>{pad=null;showPad();});
 
 /* ---------- loop ---------- */
 function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(canvas.width!==Math.floor(w*renderer.getPixelRatio())||canvas.height!==Math.floor(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}}
@@ -538,7 +539,7 @@ function frame(now){
   resize();
   let dt=Math.min((now-last)/1000,0.05);last=now;
   readInput();
-  if(!pad)showPadOnce();
+  showPadOnce();
   if(S.started&&!S.crashed&&$('overlay').hidden){acc+=dt;let n=0;while(acc>=DT&&n<6){if(step(DT))break;acc-=DT;n++;}}
   // visual
   plane.position.copy(S.pos);plane.quaternion.copy(S.q);
@@ -548,7 +549,7 @@ function frame(now){
   updateCamera(dt);updateHUD();updateAudio();updateDrawer();
   renderer.render(scene,camera);
 }
-let padShown=false;function showPadOnce(){if(!padShown&&pollPad()){padShown=true;showPad();}}
+let padShown=null;function showPadOnce(){const has=!!pad;if(padShown!==has){padShown=has;showPad();}}
 reset();show('startCard');showPad();
 requestAnimationFrame(frame);
 })();

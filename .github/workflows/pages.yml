@@ -1,7 +1,7 @@
 name: Deploy web version
 
 # Every push to main publishes index.html to GitHub Pages, so the sim has a public link
-# (https://joseventuring.github.io/jg-flightsim/) that works on any phone or laptop with no install.
+# (https://joseventuring.github.io/flightsimulator/) that works on any phone or laptop with no install.
 on:
   push:
     branches: [main]

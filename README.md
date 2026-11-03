@@ -1,4 +1,4 @@
-# JG Flight Sim
+# JG Flight Sim (flightsimulator)
 
 Jinu's Garage RC flight simulator. Phase 1: single-player freefly and a six-gate course on the Kurianad field, flying the CraycleCub V2 (800 mm, 620 g, 2205 motor on 3S).
 
@@ -6,7 +6,7 @@ One HTML file (`index.html`) does everything. Electron wraps the same file into 
 
 ## Fly it
 
-- Web: open `index.html` in Chrome, or the GitHub Pages link once the repo is public.
+- Web: open `index.html` in Chrome, or https://joseventuring.github.io/flightsimulator/.
 - Transmitter: plug in the FlySky sim cable, move a stick so the browser sees the joystick, then open **Transmitter** and tap **Assign** on each channel while moving only that stick. Use **Inv** if a channel runs backwards. Mapping is saved in the browser.
 - Keyboard: arrows for ailerons and elevator (down arrow pulls up), A/D rudder, W/S throttle, R reset, C camera.
 - Phone: touch sticks, Mode 2.

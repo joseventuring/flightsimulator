@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icon-512.png">
-<title>JG Flight Sim</title>
+<title>JG RoveaRange: Flight Simulator</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 /* Layout: full-bleed field. Desktop: telemetry cluster top-left, dock bottom-right, setup screens docked right with the aircraft on the left.
@@ -301,7 +301,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     </div>
     <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
-    <div id="status"><b>CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
+    <div id="status"><b id="sName">CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
   </div>
   <div id="banner" hidden>THROTTLE CUT</div>
   <div id="marshal"></div>
@@ -310,6 +310,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-mode>Freefly</button>
     <button class="btn" data-cam>Pilot</button>
     <button class="btn" data-stab>Stab off</button>
+    <button class="btn" data-gear hidden>Gear down</button>
+    <button class="btn" data-flap hidden>Flaps up</button>
     <button class="btn" data-tele>Telemetry: full</button>
     <button class="btn" data-sound>Sound off</button>
     <button class="btn" id="bPause">Pause</button>
@@ -318,6 +320,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
   <div id="mtop">
     <button class="btn" data-stab>Self-level</button>
     <button class="btn" data-cam>Pilot</button>
+    <button class="btn" data-gear hidden>Gear down</button>
+    <button class="btn" data-flap hidden>Flaps up</button>
     <button class="btn" id="bPauseM" aria-label="Pause">II</button>
   </div>
   <div id="mmid"><span>THR <b id="mThr">0%</b></span><span class="rate" id="mRate" hidden>LOW RATE</span></div>
@@ -330,8 +334,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
   <div id="overlay">
     <div class="card" id="menuCard">
       <div class="menuhead">
-        <h1>JG <span>Flight Sim</span></h1>
-        <div class="sub">CraycleCub V2 · Kurianad strip, RWY 00 · v0.7</div>
+        <h1>JG <span>RoveaRange</span></h1>
+        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.8</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -497,18 +501,18 @@ body.mobile #marshal{max-width:min(420px,46vw)}
 'use strict';
 if(!window.THREE){document.getElementById('menuCard').innerHTML='<h1>3D library did not load</h1><p>Check the connection and reload.</p>';return;}
 
-/* JG Flight Sim physics. Aero convention inside: X forward, Y right, Z down; L roll right+, M nose up+, N nose right+.
+/* JG RoveaRange physics. Aero convention inside: X forward, Y right, Z down; L roll right+, M nose up+, N nose right+.
    Three.js body frame: x right, y up, z aft. Converted at the end of each step. */
 const Sim=(function(THREE){
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const V3=THREE.Vector3;
 const AC={
-  name:'CraycleCub V2', mass:0.62, features:{flaps:false,gear:false}, flapCL:0.9, flapCD:0.06, flapCm:-0.25, span:0.80, chord:0.19, S:0.152, AR:4.2, e:0.80,
+  name:'CraycleCub V2', mass:0.62, features:{flaps:false,gear:false}, flapCL:0.9, flapCD:0.06, flapCm:-0.08, span:0.80, chord:0.19, S:0.152, AR:4.2, e:0.80,
   wingPos:new V3(0,0.03,0.004), incidence:0.026, CL0:0.25, CLa:4.3, aStall:0.245, stallW:0.035, CD0:0.055, Cm0:-0.035,
   St:0.026, tailPos:new V3(0,0.01,0.30), CLat:3.4, tauE:0.55, deMax:0.38, dEps:0.35, aStallT:0.30, tailWash:0.4, tailInc:-0.012,
   Sf:0.014, finPos:new V3(0,0.07,0.28), CLaf:2.6, tauR:0.55, drMax:0.52, finWash:0.4,
   CYb:-0.25, Clb:-0.025, Clp:-0.5, Clr:0.04, Cnp:-0.03, Cnr:-0.05, Clda:0.06, Cnda:-0.012,
-  Tmax:7.2, Vpitch:30, propD:0.152, kTorque:0.005, kSwirl:0.005, spool:0.12,
+  Tmax:7.2, Vpitch:30, propD:0.152, kTorque:0.005, kSwirl:0.005, spool:0.12, edf:false, ailWash:0, gearCD:0.010, gearTime:1.6, KV:2300, blades:2,
   Ipitch:0.012, Iyaw:0.018, Iroll:0.010,
   wheels:[{p:new V3(-0.12,-0.095,-0.07),r:0.025,steer:0},{p:new V3(0.12,-0.095,-0.07),r:0.025,steer:0},{p:new V3(0,-0.05,0.31),r:0.012,steer:0.25}],
   kWheel:600, cWheel:12, muLat:0.9, muRollStrip:0.035, muRollGrass:0.13,
@@ -517,9 +521,15 @@ const AC={
 };
 const OCV=[[0,3.30],[0.08,3.55],[0.2,3.70],[0.5,3.80],[0.8,3.95],[1,4.20]];
 function ocv(soc){soc=clamp(soc,0,1);for(let i=1;i<OCV.length;i++){if(soc<=OCV[i][0]){const s0=OCV[i-1][0],v0=OCV[i-1][1],s1=OCV[i][0],v1=OCV[i][1];return v0+(v1-v0)*(soc-s0)/(s1-s0);}}return 4.2;}
+/* thrust as a fraction of static thrust at forward airspeed u.
+   Propeller: falls roughly linearly to zero at the pitch speed.
+   Ducted fan: momentum theory with a fixed fan pressure rise, Ve^2 = u^2 + Ve0^2, so T/T0 = s(s - x) with s = sqrt(1+x^2), x = u/Ve0,
+   less inlet and duct losses that grow with speed. Much flatter than a prop: weak at the start of the take-off run, strong at speed. */
+function thrustFactor(P,u){if(P.edf){const x=Math.max(u,0)/P.Vpitch,s=Math.sqrt(1+x*x);return clamp(s*(s-x)*(1-0.25*Math.min(x,1.5)),0,1);}
+  return clamp(1-u/P.Vpitch,-0.15,1);}
 function create(){
-  return {pos:new V3(0,0.11,0),vel:new V3(),q:new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),0.15),w:new V3(),
-    thr:0,T:0,time:0,usedAh:0,volt:12.6,amp:0,soc:1,onGround:true,airborne:false,alpha:0,beta:0,V:0,nz:1,stall:0,
+  return {pos:new V3(0,AC.spawnY||0.11,0),gearPos:0,vel:new V3(),q:new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),AC.spawnPitch===undefined?0.15:AC.spawnPitch),w:new V3(),
+    thr:0,T:0,time:0,usedAh:0,volt:AC.cells*4.2,amp:0,soc:1,onGround:true,airborne:false,alpha:0,beta:0,V:0,nz:1,stall:0,
     touchdown:null,maxV:0,maxAlt:0,wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
 }
 // scratch
@@ -536,9 +546,9 @@ function step(st,inp,dt,env){
   const V=_vb.length();
   const p=-st.w.z, q=st.w.x, r=-st.w.y;
   // motor and battery
-  const battF=Math.pow(st.volt/12.6,2);
+  const battF=Math.pow(st.volt/(AC.cells*4.2),2);
   st.thr+=(inp.thr-st.thr)*(1-Math.exp(-dt/AC.spool));
-  let T=AC.Tmax*st.thr*battF*clamp(1-u/AC.Vpitch,-0.15,1);
+  let T=AC.Tmax*st.thr*battF*thrustFactor(AC,u);
   if(st.thr<0.02)T=0;
   st.T=T;
   const Ap=Math.PI*(AC.propD/2)*(AC.propD/2);
@@ -546,6 +556,9 @@ function step(st,inp,dt,env){
   st.amp=AC.Iidle+AC.Imax*Math.pow(st.thr,1.7)*battF;
   st.usedAh+=st.amp*dt/3600; st.soc=1-st.usedAh/AC.capAh;
   st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);
+  // retractable gear: travels in gearTime seconds; the ESC-style weight-on-wheels lock stops it folding on the ground
+  if(AC.features&&AC.features.gear){const want=inp.gear&&!st.onGround?1:0;st.gearPos=clamp(st.gearPos+clamp(want-st.gearPos,-dt/AC.gearTime,dt/AC.gearTime),0,1);}else st.gearPos=0;
+  const gearDown=1-st.gearPos;
   // flow angles
   let alpha=0,beta=0,ex=1,ey=0,ez=0;
   if(V>0.3){alpha=Math.atan2(wv,Math.max(u,0.05*V));beta=Math.asin(clamp(v/V,-1,1));ex=u/V;ey=v/V;ez=wv/V;}
@@ -557,7 +570,7 @@ function step(st,inp,dt,env){
   const sig=1/(1+Math.exp(-(Math.abs(aw)-AC.aStall)/AC.stallW));
   const hb=clamp((st.pos.y-0.1)/AC.span,0,10), ge=Math.exp(-4*hb);
   let CL=((1-sig)*(AC.CL0+AC.flapCL*df+AC.CLa*aw)+sig*Math.sin(2*aw))*(1+0.06*ge);
-  const CD=AC.CD0+AC.flapCD*df*df*6+CL*CL/(Math.PI*AC.AR*AC.e)*(1-0.55*ge)+sig*1.4*Math.sin(aw)*Math.sin(aw)+(st.thr<0.05?0.012:0);
+  const CD=AC.CD0+AC.flapCD*df*df*6+CL*CL/(Math.PI*AC.AR*AC.e)*(1-0.55*ge)+sig*1.4*Math.sin(aw)*Math.sin(aw)+(st.thr<0.05&&!AC.edf?0.012:0)+(AC.features&&AC.features.gear?AC.gearCD*gearDown:0);
   const L=qd*AC.S*CL, D=qd*AC.S*CD;
   let FX=L*lx-D*ex, FY=-D*ey+qd*AC.S*AC.CYb*beta, FZ=L*lz-D*ez;
   let Lm=0,Mm=0,Nm=0;
@@ -585,6 +598,8 @@ function step(st,inp,dt,env){
     Lm+=qd*AC.S*b*(AC.Clb*beta+AC.Clp*ph+AC.Clr*rh+AC.Clda*inp.ail*ailEff+sig*0.03*Math.sin(st.time*1.7+st.stallSeed));
     Nm+=qd*AC.S*b*(AC.Cnp*ph+AC.Cnr*rh+AC.Cnda*inp.ail);
   } else { Lm+=-0.004*p; Nm+=-0.004*r; Mm+=-0.004*q; }
+  // ailerons inside the slipstream: on a 3D airframe this is what holds the wings level in a prop hang
+  if(AC.ailWash>0){const qs=0.5*rho*slip2*AC.ailWash;Lm+=qs*AC.S*b*AC.Clda*inp.ail-qs*AC.S*b*0.25*p*b/(2*Math.sqrt(slip2+V*V+1));}
   // propeller
   FX+=T;
   const slowF=clamp(1-V/18,0,1);
@@ -595,16 +610,19 @@ function step(st,inp,dt,env){
   _tq.set(Mm,-Nm,-Lm);
   st.nz=(-FZ)/(AC.mass*AC.g);
   // wheels
-  let contact=false, maxN=0, crash=null;
+  let contact=false, maxN=0, crash=null, hit=0;
   for(let i=0;i<3;i++){
     const W=AC.wheels[i];
+    if(st.gearPos>0.5)break;
     _pw.copy(W.p).applyQuaternion(st.q).add(st.pos);
     const pen=W.r-_pw.y; st.wheelN[i]=0;
     if(pen<=0)continue;
     _ww.copy(st.w).applyQuaternion(st.q); _rw.copy(W.p).applyQuaternion(st.q);
     _vw.copy(_ww).cross(_rw).add(st.vel);
     let N=AC.kWheel*pen-AC.cWheel*_vw.y; if(N<0)N=0;
-    const steer=W.steer*inp.rud;
+    let steer=W.steer*inp.rud;
+    /* nosewheel: throw limited so the turn never pulls more than 0.35 g sideways (tan d = a L / V^2); a narrow-track trike rolls over not far above that */
+    if(W.steer<0){const L=Math.abs(W.p.z-AC.wheels[0].p.z),lim=Math.atan(0.35*AC.g*L/(V*V+1e-3));steer=clamp(steer,-lim,lim);}
     _axle.set(Math.cos(steer),0,-Math.sin(steer)).applyQuaternion(st.q); _axle.y=0; if(_axle.lengthSq()<1e-6)_axle.set(1,0,0); _axle.normalize();
     _roll.copy(_up).cross(_axle);
     const vlat=_vw.dot(_axle), vrol=_vw.dot(_roll);
@@ -613,11 +631,12 @@ function step(st,inp,dt,env){
     _Fw.set(0,N,0).addScaledVector(_axle,-AC.muLat*N*clamp(vlat/0.12,-1,1)).addScaledVector(_roll,-muR*N*clamp(vrol/0.1,-1,1));
     _F.add(_Fw);
     _Fb.copy(_Fw).applyQuaternion(_qi); _tq.add(_rxF.copy(W.p).cross(_Fb));
-    st.wheelN[i]=N; contact=true; if(N>maxN)maxN=N; _tq.y-=0.02*st.w.y;
+    st.wheelN[i]=N; contact=true; if(N>maxN)maxN=N; if(-_vw.y>hit)hit=-_vw.y; _tq.y-=0.02*st.w.y;
   }
   st.nz+=maxN>0?(st.wheelN[0]+st.wheelN[1]+st.wheelN[2])/(AC.mass*AC.g):0;
   if(contact&&!st.onGround&&st.airborne){ st.touchdown={sink:-st.vel.y,speed:V,t:st.time}; if(-st.vel.y>2.6)crash='Hard landing at '+(-st.vel.y).toFixed(1)+' m/s down. Flare later and hold the nose up.'; }
-  if(contact&&st.time>0.5&&maxN>AC.mass*AC.g*7)crash=crash||'Gear collapsed. That was more than 7 g on the wheels.';
+  /* gear failure needs an impact: a high load alone can be the tail pressed down by the elevator in prop wash */
+  if(contact&&st.time>0.5&&maxN>AC.mass*AC.g*7&&hit>1.2)crash=crash||'Gear collapsed. That was more than 7 g on the wheels.';
   st.onGround=contact;
   if(!contact&&st.pos.y>0.4)st.airborne=true;
   // integrate
@@ -632,16 +651,16 @@ function step(st,inp,dt,env){
   // crash points
   if(st.time>0.5&&!crash){
     for(const cp of AC.crashPts){_pw.copy(cp[1]).applyQuaternion(st.q).add(st.pos);
-      if(_pw.y<0){crash=cp[0]==='prop'?(st.airborne&&!st.onGround?'Nosed in. Too much sink with the nose down.':st.thr>0.1?'Prop strike. The nose went over with power on.':'Nosed over.'):cp[0]==='fin'?'Went in inverted.':cp[0]==='belly'?'Belly hit the ground.':'Dragged the '+cp[0]+'.';break;}
+      if(_pw.y<0){if(st.gearPos>0.5&&(cp[0]==='nose'||cp[0]==='belly'||cp[0]==='prop')){crash='Landed with the gear up. Lower it on the downwind leg.';break;}crash=cp[0]==='prop'?(st.airborne&&!st.onGround?'Nosed in. Too much sink with the nose down.':st.thr>0.1?'Prop strike. The nose went over with power on.':'Nosed over.'):cp[0]==='fin'?'Went in inverted.':cp[0]==='belly'?(st.gearPos>0.5?'Landed with the gear up.':'Belly hit the ground.'):'Dragged the '+cp[0]+'.';break;}
     }
   }
   if(st.dbg){st.dbg.Nfin=-lf*FYf;st.dbg.Nswirl=-AC.kSwirl*T*slowF;st.dbg.Nrate=V>1?qd*AC.S*b*(AC.Cnp*(-st.w.z)*b/(2*V)+AC.Cnr*r*b/(2*V)):0;st.dbg.wN=st.wheelN.slice();st.dbg.bf=bf;}
   st.V=V; st.alpha=alpha; st.beta=beta; st.stall=sig; st.vsi=st.vel.y;
   if(V>st.maxV)st.maxV=V; if(st.pos.y>st.maxAlt)st.maxAlt=st.pos.y;
-  st.propAngle+=(st.thr*2300*12.6/60*6.28*0.02+V*2)*dt;
+  st.propAngle+=(st.thr*AC.KV*AC.cells*4.2/60*6.28*0.02+V*2)*dt;
   return crash;
 }
-return {AC,create,step,ocv,clamp};
+return {AC,create,step,ocv,clamp,thrustFactor};
 })(THREE);
 
 const $=id=>document.getElementById(id);
@@ -663,7 +682,7 @@ if(logbook.bestGate!==null&&typeof logbook.bestGate!=='number')logbook.bestGate=
 
 let st=Sim.create();
 const G={mode:'free',cam:'pilot',view:'fly',sound:false,started:false,flying:false,crashed:false,landed:false,paused:false,lowRate:false,kRates:false,cut:false,stab:0,kStab:0,flapPos:0,gearUp:false,viol:0,lastGroundT:0,flightStart:0,preflight:{ail:false,ele:false,rud:false,wind:false},trauma:0,frameMs:16,fps:60};
-const IN={ail:0,ele:0,rud:0,thr:0,flap:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
+const IN={ail:0,ele:0,rud:0,thr:0,flap:0,gear:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
 
 /* ---------- renderer (threejs-scene-setup, performance-optimization) ---------- */
 const canvas=$('c');
@@ -789,6 +808,19 @@ const AC_BASE=JSON.parse(JSON.stringify(AC,(k,v)=>v&&v.isVector3?{__v3:[v.x,v.y,
 const V=(x,y,z)=>new THREE.Vector3(x,y,z);
 const CUB_FUS=[[-0.318,0.064,0.070,0.000],[-0.300,0.078,0.086,0.002],[-0.250,0.084,0.096,0.006],[-0.200,0.086,0.104,0.010],[-0.130,0.086,0.118,0.020],[-0.040,0.084,0.112,0.018],[0.050,0.074,0.094,0.016],[0.140,0.058,0.074,0.018],[0.230,0.040,0.054,0.022],[0.300,0.024,0.036,0.028],[0.335,0.012,0.022,0.032]];
 const SPORT_FUS=[[-0.330,0.050,0.060,0.004],[-0.300,0.072,0.078,0.006],[-0.230,0.080,0.090,0.008],[-0.150,0.080,0.092,0.010],[-0.060,0.076,0.088,0.010],[0.050,0.064,0.074,0.012],[0.150,0.048,0.058,0.016],[0.250,0.032,0.042,0.022],[0.330,0.018,0.026,0.028],[0.360,0.010,0.016,0.030]];
+/* jet fuselage: pointed radome, 70 mm fan duct inside, exhaust at the tail */
+const JET_FUS=[[-0.430,0.010,0.010,0.000],[-0.400,0.040,0.036,0.000],[-0.350,0.062,0.060,0.004],[-0.280,0.078,0.078,0.010],[-0.200,0.086,0.090,0.012],[-0.100,0.090,0.094,0.012],[0.000,0.088,0.090,0.010],[0.120,0.080,0.080,0.010],[0.240,0.070,0.068,0.012],[0.340,0.064,0.060,0.014],[0.400,0.062,0.056,0.014]];
+/* 3D profile fuselage: a single flat side outline, the way EPP 3D planes are built */
+const PROFILE_FUS=[[-0.400,0.008,0.070,0.000],[-0.330,0.008,0.110,0.000],[-0.200,0.008,0.160,0.010],[-0.080,0.008,0.150,0.010],[0.050,0.008,0.110,0.010],[0.200,0.008,0.070,0.010],[0.350,0.008,0.050,0.012],[0.470,0.008,0.040,0.014]];
+/* tail sized from tail-volume coefficients, so a bigger aircraft keeps the stability the small ones were tuned to.
+   VH = St*lt/(S*c), VV = Sf*lf/(S*b). Tail arm comes from where the builder puts the stabiliser. */
+function tailFrom(g,ph,VH,VV){const lt=g.stabZ*g.k+0.055*g.tail;const yS=g.fus[g.fus.length-3][3]*g.k+0.008;
+  return {tailPos:{x:0,y:yS,z:lt},finPos:{x:0,y:yS+0.05*g.tail,z:lt-0.01},St:VH*ph.S*ph.chord/lt,Sf:VV*ph.S*ph.span/lt};}
+/* crash points from the geometry: wingtips, the prop (or nose), the fin top and the belly */
+function crashFrom(g,propR){const k=g.k,F=g.fus,sw=g.sweep||0,tr=g.taper||1,tx=g.tip*Math.cos(sw),tz=g.LE+g.tip*Math.sin(sw)+(g.hinge||0.75)*g.C*(1-tr)+g.C*tr*0.5,ty=g.wingY+tx*Math.sin(g.dih||0);
+  const yS=F[F.length-3][3]*k+0.008;let belly=0;F.forEach(([z,w,h,y])=>{if(Math.abs(z*k)<0.18)belly=Math.min(belly,(y-h/2)*k);});
+  const nose=g.edf?['nose',{x:0,y:(F[1][3]-F[1][2]/2)*k,z:F[0][0]*k}]:['prop',{x:0,y:F[0][3]*k-propR,z:F[0][0]*k-0.02}];
+  return [['left wingtip',{x:-tx,y:ty,z:tz}],['right wingtip',{x:tx,y:ty,z:tz}],nose,['fin',{x:0,y:yS+0.115*g.tail,z:g.stabZ*k+0.03*g.tail}],['belly',{x:0,y:belly,z:0.02}]];}
 const AIRCRAFT={
   cub:{id:'cub',name:'CraycleCub V2',role:'Trainer',price:0,blurb:'Your real plane. High wing, forgiving, slow to stall.',
     geom:{fus:CUB_FUS,cowl:4,k:1,wingY:0.066,LE:-0.135,C:0.19,tip:0.40,ail:[0.11,0.31],dih:0.05,struts:true,cabin:'side',stabZ:0.245,tail:1,spin:0.026},
@@ -804,11 +836,33 @@ const AIRCRAFT={
     phys:{name:'Talon 760',mass:0.70,span:0.76,chord:0.17,S:0.13,AR:4.4,Tmax:12,Vpitch:52,CD0:0.030,aStall:0.22,CL0:0.16,incidence:0.01,Clb:-0.02,kTorque:0.0022,kSwirl:0.0025,Clda:0.06,Cm_a:-0.70,Ipitch:0.011,Iroll:0.011,Iyaw:0.015,capAh:2.2,Imax:38,
       wheels:[{p:V(-0.12,-0.095,-0.06),r:0.025,steer:0},{p:V(0.12,-0.095,-0.06),r:0.025,steer:0},{p:V(0,-0.04,0.31),r:0.012,steer:0.25}]},
     paint:{primary:'#E8503A',secondary:'#1B222B',accent:'#F7F4EE'}},
+  arrow:{id:'arrow',name:'Arrow S-05',role:'Sport',price:2500,blurb:'1.2 m low wing, 2826 motor on 4S, about 100 km/h. Three-position flaps, a smooth cruise and honest manners. The step up from the Kestrel.',
+    geom:{fus:SPORT_FUS,cowl:3,k:1.38,wingY:-0.04,LE:-0.086,C:0.25,tip:0.60,taper:0.8,ail:[0.30,0.55],dih:0.035,flaps:true,struts:false,cabin:'bubble',stabZ:0.29,tail:1.45,spin:0.034,propR:0.14,gearTop:-0.045},
+    phys:{name:'Arrow S-05',mass:1.30,span:1.20,chord:0.226,S:0.27,AR:5.3,Tmax:20,Vpitch:42,CD0:0.036,CL0:0.22,Clb:-0.018,Clda:0.07,Cm_a:-0.8,kTorque:0.0045,kSwirl:0.005,propD:0.279,
+      Ipitch:0.045,Iroll:0.042,Iyaw:0.07,cells:4,capAh:2.2,Imax:40,KV:1000,features:{flaps:true,gear:false},
+      wheels:[{p:V(-0.17,-0.14,-0.13),r:0.035,steer:0},{p:V(0.17,-0.14,-0.13),r:0.035,steer:0},{p:V(0,-0.03,0.47),r:0.018,steer:0.25}]},
+    tail:[0.40,0.030],paint:{primary:'#F5C542',secondary:'#1B222B',accent:'#E8503A'}},
+  vortex:{id:'vortex',name:'Vortex X-06',role:'3D',price:3000,blurb:'Light EPP profile, huge surfaces, more than twice as much thrust as weight. It hangs on the prop at about half throttle and flies at walking pace. Torque rolls it in a hover, so keep flying the ailerons. Take off on low rate: full throw at take-off speed tumbles it.',
+    geom:{fus:PROFILE_FUS,profile:true,cowl:2,k:1,wingY:0.0,LE:-0.093,C:0.30,tip:0.50,taper:0.75,hinge:0.62,airfoil:'sym',ail:[0.07,0.48],dih:0,struts:false,cabin:'none',stabZ:0.35,tail:1.86,spin:0.022,propR:0.127,gearTop:-0.06},
+    phys:{name:'Vortex X-06',mass:0.40,span:1.0,chord:0.264,S:0.26,AR:3.85,Tmax:8.5,Vpitch:24,CD0:0.065,CL0:0,CLa:4.0,incidence:0,Cm0:0,aStall:0.24,stallW:0.05,Clb:-0.008,Clda:0.11,
+      deMax:0.70,drMax:0.70,tauE:0.6,tauR:0.6,aStallT:0.35,tailInc:-0.022,tailWash:0.75,finWash:0.75,ailWash:0.35,kTorque:0.006,kSwirl:0.006,spool:0.08,propD:0.254,
+      Ipitch:0.010,Iroll:0.008,Iyaw:0.015,cells:3,capAh:1.0,Imax:18,KV:1400,features:{flaps:false,gear:false},
+      wheels:[{p:V(-0.13,-0.15,-0.07),r:0.035,steer:0},{p:V(0.13,-0.15,-0.07),r:0.035,steer:0},{p:V(0,-0.012,0.43),r:0.015,steer:0.25}]},
+    tail:[0.55,0.06],paint:{primary:'#2F6B3A',secondary:'#F2EFE8',accent:'#F26522'}},
+  comet:{id:'comet',name:'Comet J-09',role:'Jet',price:6000,blurb:'70 mm ducted fan on 6S, swept wing, retracts and flaps. The fan lags the stick and has little shove at low speed, then it is the fastest thing on the field, near 150 km/h. Lower the gear before you land.',
+    geom:{fus:JET_FUS,edf:true,cowl:3,k:1.33,wingY:-0.025,LE:-0.218,C:0.30,tip:0.68,taper:0.55,sweep:0.40,hinge:0.72,ail:[0.34,0.63],dih:0.02,flaps:true,struts:false,cabin:'bubble',stabZ:0.32,tail:1.25,spin:0.02,propR:0,gearTop:-0.035},
+    phys:{name:'Comet J-09',mass:1.50,span:1.20,chord:0.239,S:0.279,AR:5.2,Tmax:21,Vpitch:55,edf:true,CD0:0.024,CL0:0.12,incidence:0.005,aStall:0.21,Cm0:-0.02,Clb:-0.02,Clda:0.06,Cm_a:-0.8,
+      tailWash:0,finWash:0,kTorque:0.0004,kSwirl:0,spool:0.35,propD:0.07,gearCD:0.012,
+      Ipitch:0.06,Iroll:0.04,Iyaw:0.09,cells:6,capAh:3.3,Imax:65,KV:1950,blades:12,features:{flaps:true,gear:true},
+      wheels:[{p:V(-0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0,-0.145,-0.30),r:0.025,steer:-0.25}]},
+    tail:[0.40,0.035],paint:{primary:'#F2EFE8',secondary:'#1B222B',accent:'#1F4E79'}},
 };
+/* gear springs scale with weight so every aircraft sits and rebounds like the 620 g Cub they were tuned on */
+['arrow','vortex','comet'].forEach(id=>{const A=AIRCRAFT[id],m=A.phys.mass/0.62;Object.assign(A.phys,tailFrom(A.geom,A.phys,A.tail[0],A.tail[1]),{crashPts:crashFrom(A.geom,A.geom.propR),kWheel:600*m,cWheel:12*Math.sqrt(m)});});
 const WARDEN={id:'warden',name:'Coast Warden',geom:Object.assign({},AIRCRAFT.kestrel.geom,{k:1.3,tip:0.5,decal:'WARDEN'}),paint:{primary:'#F2EFE8',secondary:'#16365C',accent:'#F26522'}};
 const UPGRADES={
   motor:[{name:'Stock',cost:0,T:1,I:1,Vp:1},{name:'Sport',cost:600,T:1.18,I:1.15,Vp:1.08},{name:'Race',cost:1500,T:1.35,I:1.32,Vp:1.15}],
-  battery:[{name:'3S 2200',cost:0,cap:2.2,dm:0},{name:'3S 3000',cost:500,cap:3.0,dm:0.06}],
+  battery:[{name:'Stock pack',cost:0,cap:1,dm:0},{name:'Big pack',cost:500,cap:1.36,dm:0.08}],
   prop:[{name:'Standard',cost:0,Vp:1,T:1},{name:'High pitch',cost:400,Vp:1.15,T:0.94}],
 };
 const PAINTS=['#202429','#F2EFE8','#F26522','#1F4E79','#E8503A','#2F6B3A','#F5C542','#7A4FA0','#5A6676','#16365C'];
@@ -820,22 +874,29 @@ function saveCareer(){store.set('jgsim.career',career);}
 function upOf(id){return Object.assign({motor:0,battery:0,prop:0},career.up[id]||{});}
 function paintOf(id){return Object.assign({},AIRCRAFT[id].paint,career.paint[id]||{});}
 /* apply an aircraft and its upgrades to the live flight model */
-function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const keep=['wheels','crashPts','wingPos','tailPos','finPos'];
-  for(const k in AC_BASE){if(keep.includes(k))continue;AC[k]=AC_BASE[k];}
-  AC.wheels=AC_BASE.wheels.map(w=>({p:w.p.clone(),r:w.r,steer:w.steer}));
-  Object.assign(AC,JSON.parse(JSON.stringify(A.phys,(k,v)=>k==='wheels'?undefined:v)));
-  if(A.phys.wheels)AC.wheels=A.phys.wheels.map(w=>({p:w.p.clone(),r:w.r,steer:w.steer}));
+const toV=o=>new THREE.Vector3(o.x,o.y,o.z);
+function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wheels','crashPts','wingPos','tailPos','finPos','features'];
+  for(const k in AC_BASE){if(vec.includes(k))continue;AC[k]=AC_BASE[k];}
+  ['wingPos','tailPos','finPos'].forEach(k=>AC[k]=toV(A.phys[k]||AC_BASE[k]));
+  AC.wheels=(A.phys.wheels||AC_BASE.wheels).map(w=>({p:w.p.clone(),r:w.r,steer:w.steer}));
+  Object.assign(AC,JSON.parse(JSON.stringify(A.phys,(k,v)=>vec.includes(k)?undefined:v)));
   const m=UPGRADES.motor[u.motor],b=UPGRADES.battery[u.battery],p=UPGRADES.prop[u.prop];
-  AC.Tmax*=m.T*p.T;AC.Imax*=m.I;AC.Vpitch*=m.Vp*p.Vp;AC.capAh=b.cap;AC.mass+=b.dm;
+  AC.Tmax*=m.T*p.T;AC.Imax*=m.I;AC.Vpitch*=m.Vp*p.Vp;AC.capAh*=b.cap;AC.mass*=1+b.dm;
   const sc=A.phys.span/0.8;
-  AC.crashPts=AC_BASE.crashPts.map(([n,p])=>[n,new THREE.Vector3(p.x*sc,p.y,p.z*A.geom.k)]);
-  AC.features={flaps:false,gear:false};}
+  AC.crashPts=A.phys.crashPts?A.phys.crashPts.map(([n,p])=>[n,toV(p)]):AC_BASE.crashPts.map(([n,p])=>[n,new THREE.Vector3(p.x*sc,p.y,p.z*A.geom.k)]);
+  AC.features=Object.assign({flaps:false,gear:false},A.phys.features||{});
+  /* resting attitude: the angle that puts the main wheels and the third wheel on the ground together */
+  const W=AC.wheels,ym=W[0].p.y-W[0].r,yt=W[2].p.y-W[2].r,th=Math.atan((ym-yt)/(W[0].p.z-W[2].p.z));
+  AC.spawnPitch=th;AC.spawnY=-(ym*Math.cos(th)-W[0].p.z*Math.sin(th))+0.002;}
 /* stats for the hangar bars, from the physics itself so they cannot drift from how the plane flies */
+/* the pack a battery upgrade gives this aircraft, e.g. 4S 3000 */
+function packName(id,i){const P=Object.assign({},AC_BASE,AIRCRAFT[id].phys);return P.cells+'S '+Math.round(P.capAh*UPGRADES.battery[i].cap*10)*100;}
 function statsOf(id){const A=AIRCRAFT[id],u=upOf(id);const P=Object.assign({},AC_BASE,A.phys);const m=UPGRADES.motor[u.motor],b=UPGRADES.battery[u.battery],p=UPGRADES.prop[u.prop];
-  const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass+b.dm,CL=(P.CL0||0.25)+(P.CLa||4.3)*(P.aStall||0.245);
+  const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass*(1+b.dm),CL=P.CL0+P.CLa*P.aStall;
   const vs=Math.sqrt(2*mass*9.81/(1.18*P.S*CL))*3.6;
-  let v=10;for(let i=0;i<60;i++){const thrust=T*Math.max(0,1-v/Vp);const D=0.5*1.18*v*v*P.S*(P.CD0+0.015);v+=(thrust-D)*0.4;v=Math.max(5,v);}
-  const vmax=v*3.6,climb=(T/(mass*9.81)),roll=(P.Clda||0.06)/(P.Iroll||0.01)/6,endur=b.cap/(P.Imax*m.I*0.45)*60;
+  let v=10;for(let i=0;i<80;i++){const thrust=T*Math.max(0,Sim.thrustFactor({edf:P.edf,Vpitch:Vp},v));const D=0.5*1.18*v*v*P.S*(P.CD0+0.015);v+=(thrust-D)*0.4;v=Math.max(5,v);}
+  /* steady roll rate at 60% of top speed: p = (Clda/-Clp) * 2V/b */
+  const vmax=v*3.6,climb=(T/(mass*9.81)),roll=P.Clda/(-P.Clp)*2*(0.6*v)/P.span*57.3,endur=P.capAh*b.cap/(P.Imax*m.I*0.45)*60;
   return {vmax,vs,climb,roll,endur};}
 
 /* ---------- aircraft data sheet ---------- */
@@ -862,8 +923,8 @@ const CY_L=[[0,0],[0.0125,-0.012],[0.025,-0.017],[0.05,-0.0205],[0.1,-0.022],[0.
 function yAt(tab,x){for(let i=1;i<tab.length;i++){if(x<=tab[i][0]){const [x0,y0]=tab[i-1],[x1,y1]=tab[i];return y0+(y1-y0)*(x-x0)/(x1-x0);}}return tab[tab.length-1][1];}
 /* section of the airfoil between x0..x1 (fractions of chord), chord c, span along +x from 0..span.
    hinge: chord fraction that sits at local z=0 (so a hinged part rotates about its real hinge line). */
-function wingPart(c,x0,x1,span,hinge){const st=[];for(let i=0;i<=16;i++){const x=x0+(x1-x0)*i/16;st.push(x);}
-  const shape=new THREE.Shape();const P=[];st.forEach(x=>P.push([x,yAt(CY_U,x)]));st.slice().reverse().forEach(x=>P.push([x,yAt(CY_L,x)]));
+function wingPart(c,x0,x1,span,hinge,foil){const [FU,FL]=foil||[CY_U,CY_L];const st=[];for(let i=0;i<=16;i++){const x=x0+(x1-x0)*i/16;st.push(x);}
+  const shape=new THREE.Shape();const P=[];st.forEach(x=>P.push([x,yAt(FU,x)]));st.slice().reverse().forEach(x=>P.push([x,yAt(FL,x)]));
   P.forEach(([x,y],i)=>{const sx=-(x-hinge)*c, sy=y*c;if(i===0)shape.moveTo(sx,sy);else shape.lineTo(sx,sy);});
   const g=new THREE.ExtrudeGeometry(shape,{depth:span,bevelEnabled:false,steps:1});
   g.applyMatrix4(new THREE.Matrix4().set(0,0,1,0, 0,1,0,0, -1,0,0,0, 0,0,0,1)); // shape x -> -z (so chord runs aft), extrude -> +x
@@ -872,28 +933,49 @@ function plateGeo(points,thick){const s=new THREE.Shape();points.forEach(([x,z],
 function hingeGroup(parent,x,y,z){const g=new THREE.Group();g.position.set(x,y,z);parent.add(g);return g;}
 function rodTo(parent,a,b,r,m){const v=new THREE.Vector3().subVectors(b,a);const o=sh(new THREE.Mesh(new THREE.CylinderGeometry(r,r,v.length(),6),m));o.position.copy(a).add(b).multiplyScalar(0.5);o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());parent.add(o);return o;}
 function decalTex(text,color){const c=document.createElement('canvas');c.width=512;c.height=128;const g=c.getContext('2d');g.fillStyle=color;g.font='700 '+(text.length>3?78:96)+'px Rajdhani, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(text,256,70);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;}
+/* symmetric 3D section (NACA 0008-like): flat, equal camber both sides, flies the same upright and inverted */
+const SYM_U=[[0,0],[0.0125,0.0126],[0.025,0.0174],[0.05,0.0237],[0.1,0.0312],[0.2,0.0384],[0.3,0.04],[0.4,0.0387],[0.5,0.0353],[0.6,0.0306],[0.7,0.0247],[0.8,0.0177],[0.9,0.0097],[1,0.0008]];
+const SYM_L=SYM_U.map(([x,y])=>[x,-y]);
+/* taper about the hinge line: the hinge stays straight (so surfaces rotate about their real axis), the leading edge sweeps back,
+   the trailing edge comes forward, thickness scales with chord. offX/offZ place the part inside the wing group. */
+function taperGeo(g,offX,offZ,Hz,tip,tr){if(tr>=1)return g;const P=g.attributes.position;for(let i=0;i<P.count;i++){const xg=offX+P.getX(i),s=1-(1-tr)*clamp(xg/tip,0,1);
+  const zg=offZ+P.getZ(i);P.setZ(i,Hz+(zg-Hz)*s-offZ);P.setY(i,P.getY(i)*s);}P.needsUpdate=true;g.computeVertexNormals();return g;}
 /* buildAircraft(spec, paint, wheels): returns the airframe and its moving parts.
    Sign conventions, checked against the hinge geometry (trailing edge at +z of each hinge group):
    rotation.x > 0 moves a trailing edge DOWN; rotation.y > 0 moves it RIGHT. The left wing group is mirrored in x,
    which leaves rotation about x unchanged. */
 function buildAircraft(spec,paint,wheels){
   const G0=spec.geom,k=G0.k,root=new THREE.Group();
-  const mP=pbr(new THREE.Color(paint.primary).getHex(),0.6),mS=pbr(new THREE.Color(paint.secondary).getHex(),0.55),mA=pbr(new THREE.Color(paint.accent).getHex(),0.55);
+  const mP=pbr(new THREE.Color(paint.primary).getHex(),0.6),mS=pbr(new THREE.Color(paint.secondary).getHex(),0.55),mA=pbr(new THREE.Color(paint.accent).getHex(),0.55),mDark=pbr(0x0d0f12,0.8);
   const FUS=G0.fus.map(([z,w,h,y])=>[z*k,w*k,h*k,y*k]);
-  root.add(sh(new THREE.Mesh(loft(FUS.slice(0,G0.cowl),24,3.2),mS)));
-  root.add(sh(new THREE.Mesh(loft(FUS.slice(G0.cowl-1),24,3.2),mP)));
-  const noseZ=FUS[0][0];const spinner=sh(new THREE.Mesh(new THREE.ConeGeometry(G0.spin,0.05,20),mS));spinner.rotation.x=-Math.PI/2;spinner.position.set(0,FUS[0][3],noseZ-0.025);root.add(spinner);
+  if(G0.profile){/* flat side outline, 6 mm EPP */
+    const S=new THREE.Shape();FUS.forEach(([z,w,h,y],i)=>i?S.lineTo(z,y+h/2):S.moveTo(z,y+h/2));FUS.slice().reverse().forEach(([z,w,h,y])=>S.lineTo(z,y-h/2));
+    const g=new THREE.ExtrudeGeometry(S,{depth:0.006,bevelEnabled:false});g.rotateY(-Math.PI/2);g.translate(0.003,0,0);g.computeVertexNormals();root.add(sh(new THREE.Mesh(g,mP)));
+    const box=sh(new THREE.Mesh(new THREE.BoxGeometry(0.03,0.05,0.05),mS));box.position.set(0,FUS[0][3],FUS[0][0]+0.03);root.add(box);
+    const stripe=new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.012),mA);stripe.rotation.y=Math.PI/2;stripe.position.set(0.0032,FUS[2][3]+0.035,0.05);root.add(stripe);const s2=stripe.clone();s2.rotation.y=-Math.PI/2;s2.position.x=-0.0032;root.add(s2);}
+  else{root.add(sh(new THREE.Mesh(loft(FUS.slice(0,G0.cowl),24,G0.edf?2.4:3.2),mS)));root.add(sh(new THREE.Mesh(loft(FUS.slice(G0.cowl-1),24,G0.edf?2.4:3.2),mP)));}
+  const noseZ=FUS[0][0];
+  if(!G0.edf){const spinner=sh(new THREE.Mesh(new THREE.ConeGeometry(G0.spin,0.05,20),mS));spinner.rotation.x=-Math.PI/2;spinner.position.set(0,FUS[0][3],noseZ-0.025);root.add(spinner);}
+  else{/* cheek intakes feeding the fan, and the exhaust nozzle */
+    const L=FUS[FUS.length-1];const noz=sh(new THREE.Mesh(new THREE.CylinderGeometry(L[1]*0.42,L[1]*0.46,0.05,20,1,true),matMetal));noz.rotation.x=Math.PI/2;noz.position.set(0,L[3],L[0]+0.02);root.add(noz);
+    const hole=new THREE.Mesh(new THREE.CircleGeometry(L[1]*0.42,20),mDark);hole.position.set(0,L[3],L[0]+0.044);root.add(hole);
+    const fi=FUS.findIndex(f=>f[0]>-0.2*k);const F=FUS[fi];[-1,1].forEach(sd=>{const ik=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.022*k,0.026*k,0.16*k,14,1,true),mS));ik.rotation.x=Math.PI/2;ik.position.set(sd*(F[1]/2+0.012*k),F[3]-0.01*k,F[0]+0.05*k);root.add(ik);
+      const lip=new THREE.Mesh(new THREE.CircleGeometry(0.021*k,14),mDark);lip.position.set(ik.position.x,ik.position.y,ik.position.z-0.08*k+0.002);lip.rotation.y=Math.PI;root.add(lip);});}
   if(G0.cabin==='side'){[-1,1].forEach(s=>{const w=sh(new THREE.Mesh(new THREE.PlaneGeometry(0.10*k,0.032*k),matGlass));w.position.set(s*0.0435*k,0.042*k,-0.105*k);w.rotation.y=s*Math.PI/2;root.add(w);});
     const ws=new THREE.Mesh(new THREE.PlaneGeometry(0.07*k,0.04*k),matGlass);ws.position.set(0,0.052*k,-0.168*k);ws.rotation.x=-0.75;root.add(ws);}
-  else{const b=sh(new THREE.Mesh(new THREE.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI/2),matGlass));b.scale.set(0.034*k,0.042*k,0.11*k);b.position.set(0,0.036*k,-0.11*k);root.add(b);}
-  const C=G0.C,HINGE=0.75,[A0,A1]=G0.ail,TIP=G0.tip,half=0.043*k;
-  function wing(side){const w=new THREE.Group();w.position.set(0,G0.wingY,G0.LE);w.rotation.z=side*G0.dih;w.scale.x=side;root.add(w);
-    const inner=sh(new THREE.Mesh(wingPart(C,0,1,A0-half,0),mP));inner.position.x=half;w.add(inner);
-    const mid=sh(new THREE.Mesh(wingPart(C,0,HINGE,A1-A0,0),mP));mid.position.x=A0;w.add(mid);
-    const tip=sh(new THREE.Mesh(wingPart(C,0,1,TIP-A1,0),mS));tip.position.x=A1;w.add(tip);
-    const hg=new THREE.Group();hg.position.set(A0+0.002,0,HINGE*C);w.add(hg);hg.add(sh(new THREE.Mesh(wingPart(C,HINGE,1,A1-A0-0.004,HINGE),mA)));
-    const fg=new THREE.Group();fg.position.set(half,0,HINGE*C);fg.visible=false;w.add(fg);
-    if(side>0){const d=new THREE.Mesh(new THREE.PlaneGeometry(0.16,0.04),new THREE.MeshStandardMaterial({map:decalTex(G0.decal||'JG',paint.accent),transparent:true,roughness:0.6}));d.rotation.x=-Math.PI/2;d.position.set((A0+A1)/2,0.0195*C/0.19,0.065*C/0.19);w.add(d);}
+  else if(G0.cabin==='bubble'){const b=sh(new THREE.Mesh(new THREE.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI/2),matGlass));b.scale.set(0.034*k,0.042*k,0.11*k);b.position.set(0,(G0.edf?0.045:0.036)*k,(G0.edf?-0.2:-0.11)*k);root.add(b);}
+  const C=G0.C,HINGE=G0.hinge||0.75,[A0,A1]=G0.ail,TIP=G0.tip,half=(G0.profile?0.004:0.043*k),TR=G0.taper||1,Hz=HINGE*C,SW=G0.sweep||0;
+  const foil=G0.airfoil==='sym'?[SYM_U,SYM_L]:[CY_U,CY_L];
+  const part=(x0,x1,span,hinge,offX,offZ)=>taperGeo(wingPart(C,x0,x1,span,hinge,foil),offX,offZ,Hz,TIP,TR);
+  function wing(side){const w=new THREE.Group();w.position.set(0,G0.wingY,G0.LE);w.rotation.z=side*(G0.dih||0);w.rotation.y=-side*SW;w.scale.x=side;root.add(w);
+    const fg=new THREE.Group();fg.position.set(half,0,Hz);w.add(fg);
+    if(G0.flaps){const inner=sh(new THREE.Mesh(part(0,HINGE,A0-half,0,half,0),mP));inner.position.x=half;w.add(inner);
+      fg.add(sh(new THREE.Mesh(part(HINGE,1,A0-half-0.004,HINGE,half,Hz),mS)));}
+    else{const inner=sh(new THREE.Mesh(part(0,1,A0-half,0,half,0),mP));inner.position.x=half;w.add(inner);fg.visible=false;}
+    const mid=sh(new THREE.Mesh(part(0,HINGE,A1-A0,0,A0,0),mP));mid.position.x=A0;w.add(mid);
+    const tip=sh(new THREE.Mesh(part(0,1,TIP-A1,0,A1,0),mS));tip.position.x=A1;w.add(tip);
+    const hg=new THREE.Group();hg.position.set(A0+0.002,0,Hz);w.add(hg);hg.add(sh(new THREE.Mesh(part(HINGE,1,A1-A0-0.004,HINGE,A0+0.002,Hz),mA)));
+    if(side>0){const xm=(A0+A1)/2,sm=1-(1-TR)*clamp(xm/TIP,0,1);const d=new THREE.Mesh(new THREE.PlaneGeometry(0.16*C/0.19*sm,0.04*C/0.19*sm),new THREE.MeshStandardMaterial({map:decalTex(G0.decal||'JG',paint.accent),transparent:true,roughness:0.6}));d.rotation.x=-Math.PI/2;d.position.set(xm,(G0.airfoil==='sym'?0.041:0.0195/0.19)*C*sm+0.0008,Hz-(Hz-0.065*C/0.19)*sm);w.add(d);}
     return {hinge:hg,flap:fg};}
   const wL=wing(-1),wR=wing(1);
   if(G0.struts){[-1,1].forEach(s=>{rodTo(root,new THREE.Vector3(s*0.042*k,-0.035*k,-0.07),new THREE.Vector3(s*0.20,G0.wingY-0.012,-0.07),0.0035,mS);rodTo(root,new THREE.Vector3(s*0.042*k,-0.035*k,-0.05),new THREE.Vector3(s*0.20,G0.wingY-0.012,0),0.0035,mS);});}
@@ -906,24 +988,33 @@ function buildAircraft(spec,paint,wheels){
   const rud=new THREE.Group();rud.position.set(0,stab.position.y,sz+0.062*tk);root.add(rud);
   const rS=new THREE.Shape();[[0,0],[0.04,0],[0.042,0.07],[0.025,0.112],[0,0.10]].forEach(([z,y],i)=>i?rS.lineTo(z*tk,y*tk):rS.moveTo(z*tk,y*tk));const rG=new THREE.ExtrudeGeometry(rS,{depth:0.0035,bevelEnabled:false});rG.rotateY(-Math.PI/2);rG.translate(0.00175,0,0);rG.computeVertexNormals();rud.add(sh(new THREE.Mesh(rG,mA)));
   const propHub=new THREE.Group();propHub.position.set(0,FUS[0][3],noseZ-0.012);root.add(propHub);
-  const bladeShape=new THREE.Shape();bladeShape.moveTo(0,-0.006);bladeShape.quadraticCurveTo(0.04,-0.012,0.074,-0.004);bladeShape.quadraticCurveTo(0.078,0,0.074,0.004);bladeShape.quadraticCurveTo(0.04,0.01,0,0.006);
+  const pr=(G0.propR||0.074)/0.074;
+  const bladeShape=new THREE.Shape();bladeShape.moveTo(0,-0.006*pr);bladeShape.quadraticCurveTo(0.04*pr,-0.012*pr,0.074*pr,-0.004*pr);bladeShape.quadraticCurveTo(0.078*pr,0,0.074*pr,0.004*pr);bladeShape.quadraticCurveTo(0.04*pr,0.01*pr,0,0.006*pr);
   [0,Math.PI].forEach(a=>{const b=new THREE.Mesh(new THREE.ShapeGeometry(bladeShape),new THREE.MeshStandardMaterial({color:0x111214,roughness:0.5,side:THREE.DoubleSide}));b.rotation.z=a;b.rotation.x=0.25;propHub.add(b);});
-  const propDisc=new THREE.Mesh(new THREE.CircleGeometry(0.076,32),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));propDisc.position.set(0,FUS[0][3],noseZ-0.014);root.add(propDisc);
-  const steer=new THREE.Group();
-  (wheels||[]).forEach((W,i)=>{const hub=new THREE.Group();hub.position.copy(W.p);
+  const propDisc=new THREE.Mesh(new THREE.CircleGeometry(0.076*pr,32),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));propDisc.position.set(0,FUS[0][3],noseZ-0.014);root.add(propDisc);
+  if(G0.edf){propHub.visible=false;propDisc.visible=false;}
+  /* landing gear: each leg hangs from a pivot so retracts fold the way real ones do (mains inward, nose leg aft) */
+  const steer=new THREE.Group(),legs=[];const top=G0.gearTop||-0.045;
+  (wheels||[]).forEach((W,i)=>{const leg=new THREE.Group();const main=i<2,px=main?Math.sign(W.p.x)*Math.max(0.02,Math.abs(W.p.x)*(G0.edf?1:0.15)):0;
+    leg.position.set(px,top,W.p.z);root.add(leg);const holder=main?leg:steer;if(!main){steer.position.set(0,0,0);leg.add(steer);}
+    const hub=new THREE.Group();hub.position.set(W.p.x-px,W.p.y-top,0);holder.add(hub);
     const tyre=sh(new THREE.Mesh(new THREE.TorusGeometry(W.r-W.r*0.32,W.r*0.32,8,20),matTyre));tyre.rotation.y=Math.PI/2;hub.add(tyre);
     const disc=sh(new THREE.Mesh(new THREE.CylinderGeometry(W.r*0.62,W.r*0.62,W.r*0.45,14),mS));disc.rotation.z=Math.PI/2;hub.add(disc);
-    if(i<2){root.add(hub);rodTo(root,new THREE.Vector3(Math.sign(W.p.x)*0.02,-0.045,W.p.z),W.p.clone(),0.0028,matMetal);rodTo(root,new THREE.Vector3(Math.sign(W.p.x)*0.02,-0.04,W.p.z+0.05),W.p.clone(),0.0024,matMetal);}
-    else{steer.position.set(W.p.x,0,W.p.z);hub.position.set(0,W.p.y,0);steer.add(hub);root.add(steer);rodTo(root,new THREE.Vector3(0,0.02,W.p.z-0.01),new THREE.Vector3(0,W.p.y,W.p.z),0.002,matMetal);}});
-  return {root,propHub,propDisc,steer,surf:{ailL:wL.hinge,ailR:wR.hinge,elev,rudd:rud,flapL:wL.flap,flapR:wR.flap}};}
+    rodTo(holder,new THREE.Vector3(0,0,0),hub.position.clone(),main?0.0028*Math.max(1,k*0.8):0.002*Math.max(1,k*0.8),matMetal);
+    if(main&&!G0.edf)rodTo(holder,new THREE.Vector3(0,0.005,0.05),hub.position.clone(),0.0024,matMetal);
+    legs.push({g:leg,main,side:Math.sign(W.p.x)||1,sgn:Math.sign(W.steer||1)});});
+  return {root,propHub,propDisc,steer,legs,retracts:!!(spec.phys&&spec.phys.features&&spec.phys.features.gear),surf:{ailL:wL.hinge,ailR:wR.hinge,elev,rudd:rud,flapL:wL.flap,flapR:wR.flap}};}
 const THROW={ail:0.45,ele:0.38,rud:0.5};
-function animateCraft(c,inp){c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.steer.rotation.y=-inp.rud*0.35;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;}
+function animateCraft(c,inp,gp){c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
+  /* the steerable wheel turns through the same angle the physics uses: tailwheels follow the rudder, nosewheels turn against it */
+  const sw=(c.legs&&c.legs[2])?c.legs[2].sgn:1;c.steer.rotation.y=sw*inp.rud*0.35;
+  if(c.retracts){gp=gp||0;c.legs.forEach(L=>{if(L.main)L.g.rotation.z=-L.side*gp*1.5;else L.g.rotation.x=-gp*1.55;L.g.visible=gp<0.97;});}}
 /* the player's aircraft lives in a fixed container; changing plane or paint rebuilds what is inside it */
 const plane=new THREE.Group();scene.add(plane);
-let craft=null,surf=null,propHub=null,propDisc=null;
+let craft=null,surf=null,propHub=null,propDisc=null,loadedId=null;
 function disposeTree(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();m.dispose();});}});}
-function loadPlayerAircraft(id){applyAircraftPhysics(id);if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
-function animateSurfaces(IN){animateCraft(craft,IN);}
+function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
+function animateSurfaces(IN){animateCraft(craft,IN,st.gearPos);}
 loadPlayerAircraft(career.selected);
 
 /* ---------- feedback: pooled dust particles, flash, trauma (game-feel) ---------- */
@@ -1027,7 +1118,7 @@ function showPad(){const el=$('txState');if(!el)return;const n=stickCount();if(p
 /* keyboard */
 const keys={};let kThr=0;
 window.addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;keys[e.code]=true;
-  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyP'||e.code==='Escape')togglePause();
+  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 
@@ -1065,8 +1156,9 @@ function readInput(){
   G.lowRate=G.kRates||swOn('rates');
   G.cut=swOn('cut');
   const s3=sw3('stab');G.stab=s3>=0?s3:G.kStab;
-  if(AC.features.flaps){const f=sw3('flap');if(f>=0)G.flapPos=f;}
-  if(AC.features.gear)G.gearUp=swOn('gear');
+  /* a mapped switch owns the function; without one, keys and the on-screen buttons toggle it */
+  if(AC.features.flaps&&dev&&dev.map.flap&&dev.map.flap.src){const f=sw3('flap');if(f>=0)G.flapPos=f;}
+  if(AC.features.gear&&dev&&dev.map.gear&&dev.map.gear.src)G.gearUp=swOn('gear');
   const camOn=swOn('cam');const inFlight=$('overlay').hidden&&G.started;if(camOn!==edge.cam&&inFlight&&dev&&dev.map.cam.src)cycleCam();edge.cam=camOn;
   const touching=touch.l.id!==null||touch.r.id!==null;
   if(settings.sticks||touching){if(a===null)a=touch.r.x;if(e===null)e=-touch.r.y;if(r===null)r=touch.l.x;if(t===null)t=(touch.l.y+1)/2;if(src==='keyboard')src='touch';}
@@ -1084,7 +1176,14 @@ function readInput(){
   IN.ail=ca;IN.ele=ce;IN.rud=cr;
   IN.thr=G.cut?0:clamp(t,0,1);IN.src=src;
   IN.flap=AC.features.flaps?[0,0.26,0.61][G.flapPos]:0;
+  IN.gear=AC.features.gear&&G.gearUp?1:0;
 }
+
+/* gear and flap toggles for keyboard and touch; a mapped transmitter switch overrides them on the next frame */
+function toggleGear(){if(!AC.features.gear)return;G.gearUp=!G.gearUp;if(G.flying)say(G.gearUp?(st.onGround?'Gear switch UP. The retracts will not fold until the wheels are off the ground.':'Gear coming up.'):'Gear coming down. Check three green before you land.','');syncFeatureButtons();}
+function cycleFlaps(){if(!AC.features.flaps)return;G.flapPos=(G.flapPos+1)%3;if(G.flying)say(['Flaps up.','Flaps take-off.','Flaps landing.'][G.flapPos],'');syncFeatureButtons();}
+function syncFeatureButtons(){document.querySelectorAll('[data-gear]').forEach(b=>{b.hidden=!AC.features.gear;b.textContent=G.gearUp?'Gear up':'Gear down';b.classList.toggle('on',G.gearUp);});
+  document.querySelectorAll('[data-flap]').forEach(b=>{b.hidden=!AC.features.flaps;b.textContent=['Flaps up','Flaps T/O','Flaps land'][G.flapPos];b.classList.toggle('on',G.flapPos>0);});}
 
 /* ---------- transmitter setup: autodetect, guided stick setup that cannot be left half-broken, switch capture ---------- */
 const STICKS=FUNCS.filter(f=>f.kind==='stick'), SWITCHES=FUNCS.filter(f=>f.kind!=='stick');
@@ -1208,7 +1307,8 @@ function updatePursuit(dt){
   pursuit.t+=dt;const ch=CHAPTERS[pursuit.chapter];
   if(ch.goal==='endless'&&pursuit.heat<3&&pursuit.t>60*pursuit.heat){pursuit.heat++;say('Heat '+pursuit.heat+'. Wardens are faster now.','bad');if(HEAT[pursuit.heat].n>wardens.length)spawnWarden(wardens.length);}
   const H=HEAT[pursuit.heat];let anySee=false,close=false;
-  wardens.forEach(W=>{W.speed+=(H.v-W.speed)*dt*0.5;
+  /* Wardens scale to the aircraft you fly: never slower than the heat level, and at least 90% of your top speed, so a jet still has to out-turn them */
+  const vW=Math.max(H.v,0.9*statsOf(career.selected).vmax/3.6);wardens.forEach(W=>{W.speed+=(vW-W.speed)*dt*0.5;
     const d=W.pos.distanceTo(st.pos);const lead=clamp(d/Math.max(W.speed,1),0,1.6);
     _want.copy(st.pos).addScaledVector(st.vel,lead).sub(W.pos);
     const floor=terrainH(W.pos.x,W.pos.z)+(d>60?14:4);if(W.pos.y<floor+6)_want.y=Math.max(_want.y,(floor+6-W.pos.y)*4);
@@ -1259,11 +1359,13 @@ function initAudio(){try{const ctx=new (window.AudioContext||window.webkitAudioC
   const whine=ctx.createOscillator();whine.type='sine';const whineG=ctx.createGain();whineG.gain.value=0.07;whine.connect(whineG);whineG.connect(motor);
   [blade,sub,whine].forEach(o=>o.start());
   const windG=ctx.createGain();windG.gain.value=0;windG.connect(master);const nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const ns=ctx.createBufferSource();ns.buffer=nb;ns.loop=true;const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=600;bp.Q.value=0.6;ns.connect(bp);bp.connect(windG);ns.start();
+  /* ducted fan: broadband rush through the duct, shaped by a band that rises with fan speed; it rides the motor bus so it pans and fades with the model */
+  const jet=ctx.createGain();jet.gain.value=0;const jbp=ctx.createBiquadFilter();jbp.type='bandpass';jbp.Q.value=0.9;const js=ctx.createBufferSource();js.buffer=nb;js.loop=true;js.connect(jbp);jbp.connect(jet);jet.connect(motor);js.start();
   const warden=ctx.createGain();warden.gain.value=0;const wPan=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();warden.connect(wPan);wPan.connect(master);
   const wo=ctx.createOscillator();wo.type='sawtooth';wo.frequency.value=520;const wf=ctx.createBiquadFilter();wf.type='lowpass';wf.frequency.value=1400;wo.connect(wf);wf.connect(warden);wo.start();
   const siren=ctx.createOscillator();siren.type='triangle';const sirenG=ctx.createGain();sirenG.gain.value=0;siren.connect(sirenG);sirenG.connect(wPan);siren.start();
   const alerts=ctx.createGain();alerts.gain.value=0.9;alerts.connect(master);
-  audio={ctx,master,pan,motor,air,blade,sub,whine,wind:windG,windF:bp,alerts,warden,wPan,wo,siren,sirenG};}catch(e){audio=null;}}
+  audio={ctx,master,pan,motor,air,blade,sub,whine,jet,jbp,bladeG,subG,whineG,wind:windG,windF:bp,alerts,warden,wPan,wo,siren,sirenG};}catch(e){audio=null;}}
 function tone(freq,dur,type,vol,bus){if(!audio)return;const o=audio.ctx.createOscillator(),g=audio.ctx.createGain();o.type=type||'square';o.frequency.value=freq*(1+(Math.random()-0.5)*0.06);g.gain.value=vol;g.gain.setTargetAtTime(0,audio.ctx.currentTime+dur*0.6,dur*0.2);o.connect(g);g.connect(bus||audio.alerts);o.start();o.stop(audio.ctx.currentTime+dur);}
 function beep(){if(G.sound)tone(2200,0.12,'square',0.05);}
 function chime(){if(G.sound){tone(880,0.18,'sine',0.06);setTimeout(()=>tone(1320,0.22,'sine',0.05),90);}}
@@ -1271,8 +1373,12 @@ function thud(k){if(G.sound)tone(70+40*k,0.25,'triangle',0.12*k);}
 const _ap=new THREE.Vector3(),_ar=new THREE.Vector3();
 function panFor(pos){_ap.copy(pos).sub(camera.position);const d=_ap.length();_ar.set(1,0,0).applyQuaternion(camera.quaternion);return {d,pan:d>0.01?clamp(_ap.dot(_ar)/d,-1,1)*0.8:0};}
 function updateAudio(dt){if(!audio)return;const on=G.sound&&!G.crashed&&!G.landed&&!G.paused&&G.view==='fly';const now=audio.ctx.currentTime;
-  const rpm=2300*Math.max(st.volt,0)*st.thr*0.78;const rot=rpm/60;const bp=Math.max(rot*2,30);
-  audio.blade.frequency.setTargetAtTime(bp,now,0.04);audio.sub.frequency.setTargetAtTime(bp*0.5,now,0.04);audio.whine.frequency.setTargetAtTime(Math.max(rot*7,60),now,0.04);
+  const rpm=AC.KV*Math.max(st.volt,0)*st.thr*0.78;const rot=rpm/60;const edf=!!AC.edf;
+  /* a prop is heard at blade-pass (2 blades); a 12-blade fan's blade-pass is far up, so the ear gets the shaft tone, the whine and the rush */
+  const bp=Math.max(edf?rot:rot*AC.blades,30);
+  audio.blade.frequency.setTargetAtTime(bp,now,0.04);audio.sub.frequency.setTargetAtTime(bp*0.5,now,0.04);audio.whine.frequency.setTargetAtTime(Math.max(edf?rot*AC.blades:rot*7,60),now,0.04);
+  audio.bladeG.gain.setTargetAtTime(edf?0.12:0.55,now,0.1);audio.subG.gain.setTargetAtTime(edf?0.05:0.22,now,0.1);audio.whineG.gain.setTargetAtTime(edf?0.05:0.07,now,0.1);
+  audio.jet.gain.setTargetAtTime(edf?0.9*st.thr:0,now,0.08);audio.jbp.frequency.setTargetAtTime(500+rot*3,now,0.08);
   const fp=panFor(st.pos);const far=G.cam==='pilot'?1/(1+fp.d/18):1;const lvl=(0.015+st.thr*0.09)*far;
   audio.motor.gain.setTargetAtTime(on?lvl:0,now,0.05);audio.air.frequency.setTargetAtTime(G.cam==='pilot'?clamp(9000/(1+fp.d/25),700,9000):6000,now,0.1);
   if(audio.pan.pan)audio.pan.pan.setTargetAtTime(G.cam==='pilot'?fp.pan:0,now,0.05);
@@ -1337,7 +1443,7 @@ const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard'
 const SIDE=new Set(['hangarCard','txCard','preCard']);   // docked right, the aircraft stays visible
 let screenStack=[];
 function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');G.view=side?'hangar':'fly';
-  if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();}
+  if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();if(id!=='hangarCard'&&!G.flying&&typeof loadedId!=='undefined'&&loadedId&&loadedId!==career.selected)loadPlayerAircraft(career.selected);}
 function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre');G.view='fly';screenStack=[];}
 function back(){screenStack.pop();const prev=screenStack.pop();if(prev)show(prev);else if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.crashed)show('crashCard');else if(G.flying)hide();else show('menuCard');}
 function togglePause(){if(!G.flying||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
@@ -1347,7 +1453,7 @@ function save(){store.set('jgsim.log',logbook);}
 function saveSettings(){store.set('jgsim.settings',settings);}
 function haptic(ms){try{if(settings.haptics&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
 function reset(){
-  st=Sim.create();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
+  st=Sim.create();G.gearUp=false;G.flapPos=0;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
   MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
   gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
   gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
@@ -1356,7 +1462,7 @@ function reset(){
   if(G.flying){hide();say('On the strip. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','', 'rwy',0);}
 }
 function goFull(){if(!MOBILE)return;try{const el=document.documentElement;const p=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):null;if(p&&p.then)p.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}catch(e){}}
-function startFlight(){G.started=true;G.flying=true;goFull();hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();
+function startFlight(){if(loadedId!==career.selected)loadPlayerAircraft(career.selected);G.started=true;G.flying=true;goFull();hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();
   say('Cleared to taxi. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','good');
   if(G.stab===2)say('Self-level is on: the stick sets a bank angle and it levels when you let go.','', 'stabinfo',0);}
 function toMenu(){G.flying=false;G.started=false;G.paused=false;if(G.mode==='pursuit')G.mode='free';reset();screenStack=[];show('menuCard');}
@@ -1390,19 +1496,19 @@ function cycleCam(){G.cam=CAMS[(CAMS.indexOf(G.cam)+1)%3];document.querySelector
 const marker=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='#F26522';g.lineWidth=7;g.beginPath();g.arc(64,64,52,0,Math.PI*2);g.stroke();
   const t=new THREE.CanvasTexture(c);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true,opacity:0.85,fog:false}));sp.renderOrder=10;scene.add(sp);return sp;})();
 /* marker: constant screen size (5% of the view height), shown only when the model is too small to read */
-function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2*d*Math.tan(camera.fov*Math.PI/360);const modelFrac=0.8/viewH;
+function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2*d*Math.tan(camera.fov*Math.PI/360);const modelFrac=AC.span/viewH;
   marker.position.copy(st.pos);const sz=viewH*(MOBILE?0.075:0.055);marker.scale.set(sz,sz,1);
   marker.visible=G.flying&&G.view==='fly'&&G.cam==='pilot'&&modelFrac<0.06;marker.material.opacity=clamp((0.06-modelFrac)/0.03,0,0.85);}
 function updateCamera(dt){
-  if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const want=new THREE.Vector3(Math.sin(a)*1.35,0.62,Math.cos(a)*1.35).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
+  if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const sc=Math.max(1,AC.span/0.8);const want=new THREE.Vector3(Math.sin(a)*1.35*sc,0.62*sc,Math.cos(a)*1.35*sc).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
   if(camera.view&&camera.view.enabled)camera.clearViewOffset();
   if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*12));camera.lookAt(camLook);
     /* Auto-zoom like RealFlight: keep the model readable but never zoom so far that the horizon and field drop out of view.
        Model fills about 1/6 of the screen height when it can; the lens never goes narrower than 18 deg (phone) or 15 deg (desktop). */
-    const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(0.8*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
+    const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(AC.span*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
     camera.fov+=(want-camera.fov)*(1-Math.exp(-dt*3));camera.updateProjectionMatrix();}
-  else if(G.cam==='chase'){const target=new THREE.Vector3(0,0.45,2.0).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*5));camPos.y=Math.max(camPos.y,0.25);camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
-  else{camera.position.copy(new THREE.Vector3(0,0.1,-0.19).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
+  else if(G.cam==='chase'){const cs=Math.max(1,AC.span/0.8);const target=new THREE.Vector3(0,0.45*cs,2.0*cs).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*(5+0.3*st.V)));camPos.y=Math.max(camPos.y,0.25);/* follow rate rises with speed so the trailing lag stays near 2 m on the jet too */camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
+  else{camera.position.copy(new THREE.Vector3(0,0.1*Math.max(1,AC.span/0.8),-0.19*AIRCRAFT[loadedId].geom.k).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
   if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}
   const buffet=st.stall*0.004*(G.cam==='fpv'?1:0);if(buffet>0&&!reduceMotion){camera.rotation.z+=buffet*Math.sin(performance.now()/1000*40);}
 }
@@ -1430,16 +1536,16 @@ function renderHangar(){const id=hgView,A=AIRCRAFT[id],own=career.owned.includes
   $('hgPlanes').innerHTML=Object.values(AIRCRAFT).map(P=>{const o=career.owned.includes(P.id);return `<div class="pl${P.id===id?' sel':''}" data-pl="${P.id}"><b>${P.name}</b><small>${P.role}</small><span class="tag ${o?'own':'lock'}">${P.id===career.selected?'Flying':o?'Owned':P.price+' cr'}</span></div>`;}).join('');
   $('hgName').textContent=A.name+' · '+A.role;$('hgBlurb').textContent=A.blurb;
   const S=statsOf(id),row=(k,v,u,f)=>`<span>${k}</span><span class="bar"><i style="width:${clamp(f,0.04,1)*100}%"></i></span><b>${v}${u}</b>`;
-  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/150)+row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45)+row('Thrust/wt',S.climb.toFixed(2),'',S.climb/2.5)+row('Roll',(S.roll).toFixed(1),'',S.roll/1.4)+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
+  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/200)+row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45)+row('Thrust/wt',S.climb.toFixed(2),'',S.climb/2.5)+row('Roll',S.roll.toFixed(0),' °/s',S.roll/450)+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
   const pt=paintOf(id);$('hgPaint').innerHTML=['primary','secondary','accent'].map(k=>`<span>${k[0].toUpperCase()+k.slice(1)}</span><span class="sw">${PAINTS.map(c=>`<button data-paint="${k}" data-c="${c}" class="${pt[k].toLowerCase()===c.toLowerCase()?'on':''}" style="background:${c}" aria-label="${k} ${c}"${own?'':' disabled'}></button>`).join('')}</span>`).join('');
   const u=upOf(id);const have=career.up[id]&&career.up[id].have||{};
-  $('hgUps').innerHTML=Object.entries(UPGRADES).map(([k,list])=>`<div class="up"><span>${k[0].toUpperCase()+k.slice(1)}</span><span class="opts">${list.map((o,i)=>{const h=i===0||(have[k]||[]).includes(i);return `<button class="btn mini${u[k]===i?' cur':h?' have':''}" data-up="${k}" data-i="${i}"${own?'':' disabled'}>${o.name}${h?'':' · '+o.cost}</button>`;}).join('')}</span></div>`).join('');
+  $('hgUps').innerHTML=Object.entries(UPGRADES).map(([k,list])=>`<div class="up"><span>${k[0].toUpperCase()+k.slice(1)}</span><span class="opts">${list.map((o,i)=>{const h=i===0||(have[k]||[]).includes(i);return `<button class="btn mini${u[k]===i?' cur':h?' have':''}" data-up="${k}" data-i="${i}"${own?'':' disabled'}>${k==='battery'?packName(id,i):o.name}${h?'':' · '+o.cost}</button>`;}).join('')}</span></div>`).join('');
   $('hgSheetWrap').hidden=id!=='cub';$('sheet').innerHTML=SHEET.map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join('');
   $('bHangarFly').textContent=own?(id===career.selected?'Fly this one':'Select and fly'):'Buy for '+A.price+' cr';$('bHangarFly').disabled=!own&&career.credits<A.price;
   $('hgHint').textContent=own?'Upgrades change the flight model itself: thrust, pitch speed, weight and endurance.':career.credits<A.price?'Earn credits in Career to unlock it.':'';}
 $('hangarCard').addEventListener('click',e=>{const pl=e.target.closest('[data-pl]'),pa=e.target.closest('[data-paint]'),up=e.target.closest('[data-up]');
-  if(pl){hgView=pl.dataset.pl;if(career.owned.includes(hgView)&&hgView!==career.selected){career.selected=hgView;saveCareer();loadPlayerAircraft(hgView);}renderHangar();}
-  if(pa&&!pa.disabled){const id=hgView;career.paint[id]=Object.assign({},career.paint[id]||{},{[pa.dataset.paint]:pa.dataset.c});saveCareer();if(id===career.selected)loadPlayerAircraft(id);renderHangar();}
+  if(pl){hgView=pl.dataset.pl;if(career.owned.includes(hgView)&&hgView!==career.selected){career.selected=hgView;saveCareer();}if(loadedId!==hgView)loadPlayerAircraft(hgView);renderHangar();}
+  if(pa&&!pa.disabled){const id=hgView;career.paint[id]=Object.assign({},career.paint[id]||{},{[pa.dataset.paint]:pa.dataset.c});saveCareer();loadPlayerAircraft(id);renderHangar();}
   if(up&&!up.disabled){const id=hgView,k=up.dataset.up,i=+up.dataset.i,o=UPGRADES[k][i];const rec=career.up[id]=career.up[id]||{};rec.have=rec.have||{};rec.have[k]=rec.have[k]||[];
     const owned=i===0||rec.have[k].includes(i);if(!owned){if(career.credits<o.cost){$('hgHint').textContent='Not enough credits for '+o.name+'.';return;}career.credits-=o.cost;rec.have[k].push(i);}
     rec[k]=i;saveCareer();if(id===career.selected)loadPlayerAircraft(id);renderHangar();}});
@@ -1472,7 +1578,7 @@ on('bHangarBack',back);
 on('bTxWizard',()=>startWizard(0));on('bTxBack',()=>{wiz.on=false;swCap=null;$('wiz').hidden=true;back();});
 on('bClear',startFlight);on('bSkipPre',startFlight);on('bPreTx',()=>openTx(false));on('bPreBack',back);
 on('bAgain',reset);on('bLandAgain',reset);on('bLandLog',showLog);on('bWinGo',hide);on('bWinAgain',reset);on('bCrashMenu',toMenu);on('bLandMenu',toMenu);
-onAll('[data-cam]',cycleCam);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
+onAll('[data-cam]',cycleCam);onAll('[data-gear]',toggleGear);onAll('[data-flap]',cycleFlaps);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
 onAll('[data-sound]',()=>{if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();G.sound=!G.sound;document.querySelectorAll('[data-sound]').forEach(b=>b.textContent='Sound '+(G.sound?'on':'off'));});
 on('bPause',togglePause);on('bPauseM',togglePause);on('bResume',togglePause);
 on('bPauseTx',()=>openTx(false));on('bPauseLog',showLog);on('bPauseReset',reset);on('bPauseMenu',toMenu);on('bPauseField',()=>show('fieldCard'));
@@ -1537,7 +1643,7 @@ function frame(now){
   updateCamera(dt);updateMarker();updateHUD(dt);drawPursuitHud();updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={plane,THREE,get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+window.JG={plane,THREE,AIRCRAFT,statsOf,get craft(){return craft},get loadedId(){return loadedId},get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
 showPad();show('menuCard');
 requestAnimationFrame(frame);
 })();

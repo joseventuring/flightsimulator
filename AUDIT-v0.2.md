@@ -81,3 +81,19 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Sound: blade-pass and brushless whine computed from KV, voltage and throttle; distance fall-off and air absorption in pilot view; stereo pan; Warden drone and siren.
 - Transmitter: "Copy mapping" export and a built-in profile table so a confirmed FS-i6 maps itself.
 - Not done: multiplayer (needs a realtime server, see notes), real CraycleCub mesh (wing and front fuselage STLs in Drive are iCloud placeholders; print parts are not in assembly position).
+
+## v0.8 (4 Nov 2026): JG RoveaRange name, first V1 fleet batch
+
+- Name: JG RoveaRange: Flight Simulator (menu, window title, installers, PWA). Repo and link unchanged.
+- New aircraft from the V1 table, built on the existing fixed-wing engine:
+  - Arrow S-05: 1.2 m sport low wing, 1.3 kg, 2826 motor on 4S, 3-position flaps. Liftoff 45 km/h, top 100 km/h, roll 223 deg/s, 2500 cr.
+  - Vortex X-06: 1.0 m 3D EPP profile, 400 g, 2208 on 3S, thrust/weight 2.2, symmetric section, huge surfaces. Liftoff 31 km/h in 4 m, top 56 km/h. Prop hang at about 55% throttle; a simple test autopilot holds it within 25 deg 90% of the time and height within 1.6 m. 3000 cr.
+  - Comet J-09: 1.2 m swept-wing jet, 1.5 kg, 70 mm EDF on 6S, retracts and flaps. Liftoff 54 km/h after 15 m, top 152 km/h, 6000 cr.
+- Physics added: ducted-fan thrust curve (momentum theory with duct losses, flatter than a prop), slower fan spool (0.8 s to 90%), prop wash over ailerons (3D hover roll authority), retractable gear (1.6 s, will not fold on the ground, drag when down costs about 15% speed, gear-up landing is a crash with its own message), pack voltage per cell count, motor KV per aircraft.
+- Scaling: tails sized from tail-volume coefficients; gear springs scale with weight; resting attitude computed from the wheels; crash points from the geometry; cameras scale with wingspan.
+- Bugs found and fixed while testing: base flap pitching moment was three times too strong (no earlier aircraft had flaps); nosewheel steering tipped the narrow-track jet, now limited to 0.35 g sideways; atan2 quadrant error in resting pitch; Comet span came out at 1.02 m from the sweep rotation, corrected to 1.17 m.
+- Hangar: previews any aircraft in 3D before you buy; battery upgrade is now relative to each aircraft's own pack (4S 2200 to 4S 3000, 6S 3300 to 6S 4500); roll shown in deg/s.
+- Sound: per-aircraft KV and blades; the jet gets a fan rush and whine instead of prop buzz.
+- Career balance: Wardens fly at least 90% of your aircraft's top speed, so the jet still has to out-turn them.
+- Tests: new test/fleet.test.js loads the shipped catalogue into the shipped physics (rest, taxi, takeoff, top speed, hands-off, roll, power-off landing) for all six aircraft: all pass. Browser: hangar previews, keyboard takeoffs, flap and gear toggles.
+- Next: Sprint Q-16 needs a multirotor physics module (acro rate mode); then Hoverwing V-14 (VTOL transition), then Rotor R-20 (collective pitch helicopter).

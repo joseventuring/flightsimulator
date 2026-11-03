@@ -28,7 +28,8 @@ function updatePursuit(dt){
   pursuit.t+=dt;const ch=CHAPTERS[pursuit.chapter];
   if(ch.goal==='endless'&&pursuit.heat<3&&pursuit.t>60*pursuit.heat){pursuit.heat++;say('Heat '+pursuit.heat+'. Wardens are faster now.','bad');if(HEAT[pursuit.heat].n>wardens.length)spawnWarden(wardens.length);}
   const H=HEAT[pursuit.heat];let anySee=false,close=false;
-  wardens.forEach(W=>{W.speed+=(H.v-W.speed)*dt*0.5;
+  /* Wardens scale to the aircraft you fly: never slower than the heat level, and at least 90% of your top speed, so a jet still has to out-turn them */
+  const vW=Math.max(H.v,0.9*statsOf(career.selected).vmax/3.6);wardens.forEach(W=>{W.speed+=(vW-W.speed)*dt*0.5;
     const d=W.pos.distanceTo(st.pos);const lead=clamp(d/Math.max(W.speed,1),0,1.6);
     _want.copy(st.pos).addScaledVector(st.vel,lead).sub(W.pos);
     const floor=terrainH(W.pos.x,W.pos.z)+(d>60?14:4);if(W.pos.y<floor+6)_want.y=Math.max(_want.y,(floor+6-W.pos.y)*4);

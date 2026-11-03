@@ -1,7 +1,7 @@
 {
-  "name": "JG Flight Sim",
-  "short_name": "JG Sim",
-  "description": "Jinu's Garage RC flight simulator: CraycleCub V2 on the Kurianad strip.",
+  "name": "JG RoveaRange: Flight Simulator",
+  "short_name": "RoveaRange",
+  "description": "Jinu's Garage RC flight simulator: six aircraft, career pursuits and real transmitter support on the Kurianad strip.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

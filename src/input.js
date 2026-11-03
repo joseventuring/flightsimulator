@@ -43,7 +43,7 @@ function showPad(){const el=$('txState');if(!el)return;const n=stickCount();if(p
 /* keyboard */
 const keys={};let kThr=0;
 window.addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;keys[e.code]=true;
-  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyP'||e.code==='Escape')togglePause();
+  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 
@@ -81,8 +81,9 @@ function readInput(){
   G.lowRate=G.kRates||swOn('rates');
   G.cut=swOn('cut');
   const s3=sw3('stab');G.stab=s3>=0?s3:G.kStab;
-  if(AC.features.flaps){const f=sw3('flap');if(f>=0)G.flapPos=f;}
-  if(AC.features.gear)G.gearUp=swOn('gear');
+  /* a mapped switch owns the function; without one, keys and the on-screen buttons toggle it */
+  if(AC.features.flaps&&dev&&dev.map.flap&&dev.map.flap.src){const f=sw3('flap');if(f>=0)G.flapPos=f;}
+  if(AC.features.gear&&dev&&dev.map.gear&&dev.map.gear.src)G.gearUp=swOn('gear');
   const camOn=swOn('cam');const inFlight=$('overlay').hidden&&G.started;if(camOn!==edge.cam&&inFlight&&dev&&dev.map.cam.src)cycleCam();edge.cam=camOn;
   const touching=touch.l.id!==null||touch.r.id!==null;
   if(settings.sticks||touching){if(a===null)a=touch.r.x;if(e===null)e=-touch.r.y;if(r===null)r=touch.l.x;if(t===null)t=(touch.l.y+1)/2;if(src==='keyboard')src='touch';}
@@ -100,4 +101,11 @@ function readInput(){
   IN.ail=ca;IN.ele=ce;IN.rud=cr;
   IN.thr=G.cut?0:clamp(t,0,1);IN.src=src;
   IN.flap=AC.features.flaps?[0,0.26,0.61][G.flapPos]:0;
+  IN.gear=AC.features.gear&&G.gearUp?1:0;
 }
+
+/* gear and flap toggles for keyboard and touch; a mapped transmitter switch overrides them on the next frame */
+function toggleGear(){if(!AC.features.gear)return;G.gearUp=!G.gearUp;if(G.flying)say(G.gearUp?(st.onGround?'Gear switch UP. The retracts will not fold until the wheels are off the ground.':'Gear coming up.'):'Gear coming down. Check three green before you land.','');syncFeatureButtons();}
+function cycleFlaps(){if(!AC.features.flaps)return;G.flapPos=(G.flapPos+1)%3;if(G.flying)say(['Flaps up.','Flaps take-off.','Flaps landing.'][G.flapPos],'');syncFeatureButtons();}
+function syncFeatureButtons(){document.querySelectorAll('[data-gear]').forEach(b=>{b.hidden=!AC.features.gear;b.textContent=G.gearUp?'Gear up':'Gear down';b.classList.toggle('on',G.gearUp);});
+  document.querySelectorAll('[data-flap]').forEach(b=>{b.hidden=!AC.features.flaps;b.textContent=['Flaps up','Flaps T/O','Flaps land'][G.flapPos];b.classList.toggle('on',G.flapPos>0);});}

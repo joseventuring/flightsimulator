@@ -1,8 +1,8 @@
 {
   "name": "flightsimulator",
-  "productName": "JG Flight Sim",
-  "version": "0.7.0",
-  "description": "Jinu's Garage RC flight simulator: CraycleCub V2 on the Kurianad field, FlySky sim-cable ready.",
+  "productName": "JG RoveaRange",
+  "version": "0.8.0",
+  "description": "JG RoveaRange: Flight Simulator. Jinu's Garage RC flight simulator, FlySky sim-cable ready.",
   "main": "electron/main.js",
   "author": "Jinu's Garage",
   "license": "UNLICENSED",
@@ -12,7 +12,7 @@
     "dist": "electron-builder --publish never",
     "release": "electron-builder --publish always",
     "build": "python3 build.py",
-    "test": "node test/physics.test.js all"
+    "test": "node test/physics.test.js all && node test/fleet.test.js"
   },
   "devDependencies": {
     "electron": "33.2.0",
@@ -21,8 +21,8 @@
   },
   "build": {
     "appId": "in.jinujose.garage.flightsim",
-    "productName": "JG Flight Sim",
-    "artifactName": "JG-Flight-Sim-${version}-${os}-${arch}.${ext}",
+    "productName": "JG RoveaRange",
+    "artifactName": "JG-RoveaRange-${version}-${os}-${arch}.${ext}",
     "files": [
       "index.html",
       "electron/**",

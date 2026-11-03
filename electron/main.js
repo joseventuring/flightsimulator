@@ -7,7 +7,7 @@ function createWindow() {
     height: 800,
     minWidth: 720,
     minHeight: 480,
-    title: 'JG Flight Sim',
+    title: 'JG RoveaRange: Flight Simulator',
     backgroundColor: '#1B222B',
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, sandbox: true }

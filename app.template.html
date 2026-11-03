@@ -1,4 +1,4 @@
-<title>JG Flight Sim</title>
+<title>JG RoveaRange: Flight Simulator</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -289,7 +289,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     </div>
     <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
-    <div id="status"><b>CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
+    <div id="status"><b id="sName">CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
   </div>
   <div id="banner" hidden>THROTTLE CUT</div>
   <div id="marshal"></div>
@@ -298,6 +298,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-mode>Freefly</button>
     <button class="btn" data-cam>Pilot</button>
     <button class="btn" data-stab>Stab off</button>
+    <button class="btn" data-gear hidden>Gear down</button>
+    <button class="btn" data-flap hidden>Flaps up</button>
     <button class="btn" data-tele>Telemetry: full</button>
     <button class="btn" data-sound>Sound off</button>
     <button class="btn" id="bPause">Pause</button>
@@ -306,6 +308,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
   <div id="mtop">
     <button class="btn" data-stab>Self-level</button>
     <button class="btn" data-cam>Pilot</button>
+    <button class="btn" data-gear hidden>Gear down</button>
+    <button class="btn" data-flap hidden>Flaps up</button>
     <button class="btn" id="bPauseM" aria-label="Pause">II</button>
   </div>
   <div id="mmid"><span>THR <b id="mThr">0%</b></span><span class="rate" id="mRate" hidden>LOW RATE</span></div>
@@ -318,8 +322,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
   <div id="overlay">
     <div class="card" id="menuCard">
       <div class="menuhead">
-        <h1>JG <span>Flight Sim</span></h1>
-        <div class="sub">CraycleCub V2 · Kurianad strip, RWY 00 · v0.7</div>
+        <h1>JG <span>RoveaRange</span></h1>
+        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.8</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -504,7 +508,7 @@ if(logbook.bestGate!==null&&typeof logbook.bestGate!=='number')logbook.bestGate=
 
 let st=Sim.create();
 const G={mode:'free',cam:'pilot',view:'fly',sound:false,started:false,flying:false,crashed:false,landed:false,paused:false,lowRate:false,kRates:false,cut:false,stab:0,kStab:0,flapPos:0,gearUp:false,viol:0,lastGroundT:0,flightStart:0,preflight:{ail:false,ele:false,rud:false,wind:false},trauma:0,frameMs:16,fps:60};
-const IN={ail:0,ele:0,rud:0,thr:0,flap:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
+const IN={ail:0,ele:0,rud:0,thr:0,flap:0,gear:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
 
 /*__SCENE__*/
 /*__AIRCRAFT__*/
@@ -561,7 +565,7 @@ function frame(now){
   updateCamera(dt);updateMarker();updateHUD(dt);drawPursuitHud();updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={plane,THREE,get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+window.JG={plane,THREE,AIRCRAFT,statsOf,get craft(){return craft},get loadedId(){return loadedId},get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
 showPad();show('menuCard');
 requestAnimationFrame(frame);
 })();

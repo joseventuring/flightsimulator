@@ -1,6 +1,8 @@
-# JG Flight Sim (flightsimulator)
+# JG RoveaRange: Flight Simulator (repo: flightsimulator)
 
-Jinu's Garage RC flight simulator. Phase 1: single-player freefly and a six-gate course on the Kurianad field, flying the CraycleCub V2 (800 mm, 620 g, 2205 motor on 3S).
+Jinu's Garage RC flight simulator on the Kurianad field. Six aircraft so far: CraycleCub V2 (trainer), Kestrel 900, Talon 760, Arrow S-05 (1.2 m sport, flaps), Vortex X-06 (3D, hovers on the prop) and Comet J-09 (70 mm EDF jet with retracts). Freefly, a six-gate course and the Coast Wardens career.
+
+Keys: U gear, F flaps (or map transmitter switches).
 
 One HTML file (`index.html`) does everything. Electron wraps the same file into Mac, Windows and Linux installers.
 

@@ -5,7 +5,7 @@ const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard'
 const SIDE=new Set(['hangarCard','txCard','preCard']);   // docked right, the aircraft stays visible
 let screenStack=[];
 function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');G.view=side?'hangar':'fly';
-  if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();}
+  if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();if(id!=='hangarCard'&&!G.flying&&typeof loadedId!=='undefined'&&loadedId&&loadedId!==career.selected)loadPlayerAircraft(career.selected);}
 function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre');G.view='fly';screenStack=[];}
 function back(){screenStack.pop();const prev=screenStack.pop();if(prev)show(prev);else if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.crashed)show('crashCard');else if(G.flying)hide();else show('menuCard');}
 function togglePause(){if(!G.flying||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
@@ -15,7 +15,7 @@ function save(){store.set('jgsim.log',logbook);}
 function saveSettings(){store.set('jgsim.settings',settings);}
 function haptic(ms){try{if(settings.haptics&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
 function reset(){
-  st=Sim.create();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
+  st=Sim.create();G.gearUp=false;G.flapPos=0;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
   MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
   gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
   gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
@@ -24,7 +24,7 @@ function reset(){
   if(G.flying){hide();say('On the strip. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','', 'rwy',0);}
 }
 function goFull(){if(!MOBILE)return;try{const el=document.documentElement;const p=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):null;if(p&&p.then)p.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}catch(e){}}
-function startFlight(){G.started=true;G.flying=true;goFull();hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();
+function startFlight(){if(loadedId!==career.selected)loadPlayerAircraft(career.selected);G.started=true;G.flying=true;goFull();hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();
   say('Cleared to taxi. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','good');
   if(G.stab===2)say('Self-level is on: the stick sets a bank angle and it levels when you let go.','', 'stabinfo',0);}
 function toMenu(){G.flying=false;G.started=false;G.paused=false;if(G.mode==='pursuit')G.mode='free';reset();screenStack=[];show('menuCard');}
@@ -58,19 +58,19 @@ function cycleCam(){G.cam=CAMS[(CAMS.indexOf(G.cam)+1)%3];document.querySelector
 const marker=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='#F26522';g.lineWidth=7;g.beginPath();g.arc(64,64,52,0,Math.PI*2);g.stroke();
   const t=new THREE.CanvasTexture(c);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true,opacity:0.85,fog:false}));sp.renderOrder=10;scene.add(sp);return sp;})();
 /* marker: constant screen size (5% of the view height), shown only when the model is too small to read */
-function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2*d*Math.tan(camera.fov*Math.PI/360);const modelFrac=0.8/viewH;
+function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2*d*Math.tan(camera.fov*Math.PI/360);const modelFrac=AC.span/viewH;
   marker.position.copy(st.pos);const sz=viewH*(MOBILE?0.075:0.055);marker.scale.set(sz,sz,1);
   marker.visible=G.flying&&G.view==='fly'&&G.cam==='pilot'&&modelFrac<0.06;marker.material.opacity=clamp((0.06-modelFrac)/0.03,0,0.85);}
 function updateCamera(dt){
-  if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const want=new THREE.Vector3(Math.sin(a)*1.35,0.62,Math.cos(a)*1.35).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
+  if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const sc=Math.max(1,AC.span/0.8);const want=new THREE.Vector3(Math.sin(a)*1.35*sc,0.62*sc,Math.cos(a)*1.35*sc).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
   if(camera.view&&camera.view.enabled)camera.clearViewOffset();
   if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*12));camera.lookAt(camLook);
     /* Auto-zoom like RealFlight: keep the model readable but never zoom so far that the horizon and field drop out of view.
        Model fills about 1/6 of the screen height when it can; the lens never goes narrower than 18 deg (phone) or 15 deg (desktop). */
-    const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(0.8*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
+    const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(AC.span*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
     camera.fov+=(want-camera.fov)*(1-Math.exp(-dt*3));camera.updateProjectionMatrix();}
-  else if(G.cam==='chase'){const target=new THREE.Vector3(0,0.45,2.0).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*5));camPos.y=Math.max(camPos.y,0.25);camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
-  else{camera.position.copy(new THREE.Vector3(0,0.1,-0.19).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
+  else if(G.cam==='chase'){const cs=Math.max(1,AC.span/0.8);const target=new THREE.Vector3(0,0.45*cs,2.0*cs).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*(5+0.3*st.V)));camPos.y=Math.max(camPos.y,0.25);/* follow rate rises with speed so the trailing lag stays near 2 m on the jet too */camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
+  else{camera.position.copy(new THREE.Vector3(0,0.1*Math.max(1,AC.span/0.8),-0.19*AIRCRAFT[loadedId].geom.k).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
   if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}
   const buffet=st.stall*0.004*(G.cam==='fpv'?1:0);if(buffet>0&&!reduceMotion){camera.rotation.z+=buffet*Math.sin(performance.now()/1000*40);}
 }
@@ -98,16 +98,16 @@ function renderHangar(){const id=hgView,A=AIRCRAFT[id],own=career.owned.includes
   $('hgPlanes').innerHTML=Object.values(AIRCRAFT).map(P=>{const o=career.owned.includes(P.id);return `<div class="pl${P.id===id?' sel':''}" data-pl="${P.id}"><b>${P.name}</b><small>${P.role}</small><span class="tag ${o?'own':'lock'}">${P.id===career.selected?'Flying':o?'Owned':P.price+' cr'}</span></div>`;}).join('');
   $('hgName').textContent=A.name+' · '+A.role;$('hgBlurb').textContent=A.blurb;
   const S=statsOf(id),row=(k,v,u,f)=>`<span>${k}</span><span class="bar"><i style="width:${clamp(f,0.04,1)*100}%"></i></span><b>${v}${u}</b>`;
-  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/150)+row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45)+row('Thrust/wt',S.climb.toFixed(2),'',S.climb/2.5)+row('Roll',(S.roll).toFixed(1),'',S.roll/1.4)+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
+  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/200)+row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45)+row('Thrust/wt',S.climb.toFixed(2),'',S.climb/2.5)+row('Roll',S.roll.toFixed(0),' °/s',S.roll/450)+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
   const pt=paintOf(id);$('hgPaint').innerHTML=['primary','secondary','accent'].map(k=>`<span>${k[0].toUpperCase()+k.slice(1)}</span><span class="sw">${PAINTS.map(c=>`<button data-paint="${k}" data-c="${c}" class="${pt[k].toLowerCase()===c.toLowerCase()?'on':''}" style="background:${c}" aria-label="${k} ${c}"${own?'':' disabled'}></button>`).join('')}</span>`).join('');
   const u=upOf(id);const have=career.up[id]&&career.up[id].have||{};
-  $('hgUps').innerHTML=Object.entries(UPGRADES).map(([k,list])=>`<div class="up"><span>${k[0].toUpperCase()+k.slice(1)}</span><span class="opts">${list.map((o,i)=>{const h=i===0||(have[k]||[]).includes(i);return `<button class="btn mini${u[k]===i?' cur':h?' have':''}" data-up="${k}" data-i="${i}"${own?'':' disabled'}>${o.name}${h?'':' · '+o.cost}</button>`;}).join('')}</span></div>`).join('');
+  $('hgUps').innerHTML=Object.entries(UPGRADES).map(([k,list])=>`<div class="up"><span>${k[0].toUpperCase()+k.slice(1)}</span><span class="opts">${list.map((o,i)=>{const h=i===0||(have[k]||[]).includes(i);return `<button class="btn mini${u[k]===i?' cur':h?' have':''}" data-up="${k}" data-i="${i}"${own?'':' disabled'}>${k==='battery'?packName(id,i):o.name}${h?'':' · '+o.cost}</button>`;}).join('')}</span></div>`).join('');
   $('hgSheetWrap').hidden=id!=='cub';$('sheet').innerHTML=SHEET.map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join('');
   $('bHangarFly').textContent=own?(id===career.selected?'Fly this one':'Select and fly'):'Buy for '+A.price+' cr';$('bHangarFly').disabled=!own&&career.credits<A.price;
   $('hgHint').textContent=own?'Upgrades change the flight model itself: thrust, pitch speed, weight and endurance.':career.credits<A.price?'Earn credits in Career to unlock it.':'';}
 $('hangarCard').addEventListener('click',e=>{const pl=e.target.closest('[data-pl]'),pa=e.target.closest('[data-paint]'),up=e.target.closest('[data-up]');
-  if(pl){hgView=pl.dataset.pl;if(career.owned.includes(hgView)&&hgView!==career.selected){career.selected=hgView;saveCareer();loadPlayerAircraft(hgView);}renderHangar();}
-  if(pa&&!pa.disabled){const id=hgView;career.paint[id]=Object.assign({},career.paint[id]||{},{[pa.dataset.paint]:pa.dataset.c});saveCareer();if(id===career.selected)loadPlayerAircraft(id);renderHangar();}
+  if(pl){hgView=pl.dataset.pl;if(career.owned.includes(hgView)&&hgView!==career.selected){career.selected=hgView;saveCareer();}if(loadedId!==hgView)loadPlayerAircraft(hgView);renderHangar();}
+  if(pa&&!pa.disabled){const id=hgView;career.paint[id]=Object.assign({},career.paint[id]||{},{[pa.dataset.paint]:pa.dataset.c});saveCareer();loadPlayerAircraft(id);renderHangar();}
   if(up&&!up.disabled){const id=hgView,k=up.dataset.up,i=+up.dataset.i,o=UPGRADES[k][i];const rec=career.up[id]=career.up[id]||{};rec.have=rec.have||{};rec.have[k]=rec.have[k]||[];
     const owned=i===0||rec.have[k].includes(i);if(!owned){if(career.credits<o.cost){$('hgHint').textContent='Not enough credits for '+o.name+'.';return;}career.credits-=o.cost;rec.have[k].push(i);}
     rec[k]=i;saveCareer();if(id===career.selected)loadPlayerAircraft(id);renderHangar();}});
@@ -140,7 +140,7 @@ on('bHangarBack',back);
 on('bTxWizard',()=>startWizard(0));on('bTxBack',()=>{wiz.on=false;swCap=null;$('wiz').hidden=true;back();});
 on('bClear',startFlight);on('bSkipPre',startFlight);on('bPreTx',()=>openTx(false));on('bPreBack',back);
 on('bAgain',reset);on('bLandAgain',reset);on('bLandLog',showLog);on('bWinGo',hide);on('bWinAgain',reset);on('bCrashMenu',toMenu);on('bLandMenu',toMenu);
-onAll('[data-cam]',cycleCam);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
+onAll('[data-cam]',cycleCam);onAll('[data-gear]',toggleGear);onAll('[data-flap]',cycleFlaps);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
 onAll('[data-sound]',()=>{if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();G.sound=!G.sound;document.querySelectorAll('[data-sound]').forEach(b=>b.textContent='Sound '+(G.sound?'on':'off'));});
 on('bPause',togglePause);on('bPauseM',togglePause);on('bResume',togglePause);
 on('bPauseTx',()=>openTx(false));on('bPauseLog',showLog);on('bPauseReset',reset);on('bPauseMenu',toMenu);on('bPauseField',()=>show('fieldCard'));

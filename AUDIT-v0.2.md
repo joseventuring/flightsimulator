@@ -70,3 +70,14 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Keyboard throttle was frame-rate dependent; now time-based.
 - Budget: about 60 draw calls, 80k triangles on phone with shadows off by default; 150k on desktop with shadows.
 - Regression: TX wizard 8/8, surface directions 3/3, phone touch flight, physics harness unchanged.
+
+## v0.7 (4 Nov 2026): hangar, career pursuit, real textures, sound
+
+- Aircraft builder: one parametric airframe builder (fuselage loft, Clark Y wings, tail, gear) drives three aircraft and the AI patrol. Paint (primary, secondary, accent) rebuilds the model.
+- Aircraft, all flight-tested in the harness: CraycleCub V2 (liftoff 51, top 70 km/h), Kestrel 900 sport (61 / 90), Talon 760 racer (78 / 126). Talon first looped hands-off at part throttle; root cause was excess thrust against a slow-flight trim, fixed with a racer wing setting (CL0 0.16, incidence 0.01) found by sweep: now level within 6 deg at 60% throttle.
+- Upgrades change the physics: motor (thrust, current, pitch speed), battery (capacity, weight), prop (pitch speed against static thrust). Hangar stats are computed from the same physics.
+- Career "Coast Wardens" (fictional patrol): 4 chapters, heat 1 to 3, bust meter (close and in sight), cooldown meter (out of sight or past 140 m), bounty to credits, chapter rewards. Warden AI: pure pursuit with lead, turn-rate limit, terrain floor, line of sight through terrain and trees. Faster than the Cub, slower to turn.
+- Real textures from Poly Haven (CC0): laterite strip, leafy grass field, grass detail on terrain; procedural fallback if they fail to load.
+- Sound: blade-pass and brushless whine computed from KV, voltage and throttle; distance fall-off and air absorption in pilot view; stereo pan; Warden drone and siren.
+- Transmitter: "Copy mapping" export and a built-in profile table so a confirmed FS-i6 maps itself.
+- Not done: multiplayer (needs a realtime server, see notes), real CraycleCub mesh (wing and front fuselage STLs in Drive are iCloud placeholders; print parts are not in assembly position).

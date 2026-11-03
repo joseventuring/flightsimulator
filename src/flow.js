@@ -1,9 +1,11 @@
+const on=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
+const onAll=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener('click',fn));
 /* ---------- screens (game-ui-ux: a screen stack with Back, focus per screen) ---------- */
-const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard','winCard','logCard','pauseCard','fieldCard'];
+const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard','winCard','logCard','pauseCard','fieldCard','careerCard','purCard'];
 const SIDE=new Set(['hangarCard','txCard','preCard']);   // docked right, the aircraft stays visible
 let screenStack=[];
 function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');G.view=side?'hangar':'fly';
-  if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();}
+  if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();}
 function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre');G.view='fly';screenStack=[];}
 function back(){screenStack.pop();const prev=screenStack.pop();if(prev)show(prev);else if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.crashed)show('crashCard');else if(G.flying)hide();else show('menuCard');}
 function togglePause(){if(!G.flying||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
@@ -18,14 +20,16 @@ function reset(){
   gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
   gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
   camPos.set(0,1.2,3);
+  if(G.mode==='pursuit')startPursuit(pursuit.chapter);else stopPursuit();
   if(G.flying){hide();say('On the strip. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','', 'rwy',0);}
 }
 function goFull(){if(!MOBILE)return;try{const el=document.documentElement;const p=el.requestFullscreen?el.requestFullscreen({navigationUI:'hide'}):null;if(p&&p.then)p.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}catch(e){}}
 function startFlight(){G.started=true;G.flying=true;goFull();hide();if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();
   say('Cleared to taxi. RWY 00, wind '+settings.wdir+'° at '+settings.wind+' m/s.','good');
   if(G.stab===2)say('Self-level is on: the stick sets a bank angle and it levels when you let go.','', 'stabinfo',0);}
-function toMenu(){G.flying=false;G.started=false;G.paused=false;reset();screenStack=[];show('menuCard');}
+function toMenu(){G.flying=false;G.started=false;G.paused=false;if(G.mode==='pursuit')G.mode='free';reset();screenStack=[];show('menuCard');}
 function endFlight(kind,why){
+  if(pursuit.active&&pursuit.started){if(kind==='land')return endPursuit('busted');stopPursuit();career.busts++;saveCareer();}
   const air=st.airborne?st.time-G.flightStart:0;
   logbook.flights++;logbook.airtime+=air;if(air>logbook.longest)logbook.longest=air;
   if(kind==='crash'){logbook.crashes++;G.crashed=true;G.lastCrash=why;haptic([60,40,140]);feedback('large',st.pos.x,Math.max(st.pos.y,0.05),st.pos.z);thud(1);$('crashWhy').textContent=why;$('crashTime').textContent=fmtTime(air);$('crashSpd').textContent=Math.round(st.maxV*3.6);$('crashAlt').textContent=st.maxAlt.toFixed(0);setTimeout(()=>{if(G.crashed)show('crashCard');},reduceMotion?0:700);if(audio)audio.motor.gain.setTargetAtTime(0,audio.ctx.currentTime,0.05);}
@@ -87,7 +91,39 @@ function updatePreflight(){
 $('pf-wind').addEventListener('click',()=>{G.preflight.wind=true;});
 
 /* ---------- hangar, telemetry, logbook ---------- */
-function showHangar(){$('sheet').innerHTML=SHEET.map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join('');show('hangarCard');}
+let hgView=career.selected;
+function showHangar(){hgView=career.selected;renderHangar();show('hangarCard');}
+function renderHangar(){const id=hgView,A=AIRCRAFT[id],own=career.owned.includes(id);
+  $('hgCredits').textContent=career.credits;
+  $('hgPlanes').innerHTML=Object.values(AIRCRAFT).map(P=>{const o=career.owned.includes(P.id);return `<div class="pl${P.id===id?' sel':''}" data-pl="${P.id}"><b>${P.name}</b><small>${P.role}</small><span class="tag ${o?'own':'lock'}">${P.id===career.selected?'Flying':o?'Owned':P.price+' cr'}</span></div>`;}).join('');
+  $('hgName').textContent=A.name+' · '+A.role;$('hgBlurb').textContent=A.blurb;
+  const S=statsOf(id),row=(k,v,u,f)=>`<span>${k}</span><span class="bar"><i style="width:${clamp(f,0.04,1)*100}%"></i></span><b>${v}${u}</b>`;
+  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/150)+row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45)+row('Thrust/wt',S.climb.toFixed(2),'',S.climb/2.5)+row('Roll',(S.roll).toFixed(1),'',S.roll/1.4)+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
+  const pt=paintOf(id);$('hgPaint').innerHTML=['primary','secondary','accent'].map(k=>`<span>${k[0].toUpperCase()+k.slice(1)}</span><span class="sw">${PAINTS.map(c=>`<button data-paint="${k}" data-c="${c}" class="${pt[k].toLowerCase()===c.toLowerCase()?'on':''}" style="background:${c}" aria-label="${k} ${c}"${own?'':' disabled'}></button>`).join('')}</span>`).join('');
+  const u=upOf(id);const have=career.up[id]&&career.up[id].have||{};
+  $('hgUps').innerHTML=Object.entries(UPGRADES).map(([k,list])=>`<div class="up"><span>${k[0].toUpperCase()+k.slice(1)}</span><span class="opts">${list.map((o,i)=>{const h=i===0||(have[k]||[]).includes(i);return `<button class="btn mini${u[k]===i?' cur':h?' have':''}" data-up="${k}" data-i="${i}"${own?'':' disabled'}>${o.name}${h?'':' · '+o.cost}</button>`;}).join('')}</span></div>`).join('');
+  $('hgSheetWrap').hidden=id!=='cub';$('sheet').innerHTML=SHEET.map(([k,v])=>`<span>${k}</span><b>${v}</b>`).join('');
+  $('bHangarFly').textContent=own?(id===career.selected?'Fly this one':'Select and fly'):'Buy for '+A.price+' cr';$('bHangarFly').disabled=!own&&career.credits<A.price;
+  $('hgHint').textContent=own?'Upgrades change the flight model itself: thrust, pitch speed, weight and endurance.':career.credits<A.price?'Earn credits in Career to unlock it.':'';}
+$('hangarCard').addEventListener('click',e=>{const pl=e.target.closest('[data-pl]'),pa=e.target.closest('[data-paint]'),up=e.target.closest('[data-up]');
+  if(pl){hgView=pl.dataset.pl;if(career.owned.includes(hgView)&&hgView!==career.selected){career.selected=hgView;saveCareer();loadPlayerAircraft(hgView);}renderHangar();}
+  if(pa&&!pa.disabled){const id=hgView;career.paint[id]=Object.assign({},career.paint[id]||{},{[pa.dataset.paint]:pa.dataset.c});saveCareer();if(id===career.selected)loadPlayerAircraft(id);renderHangar();}
+  if(up&&!up.disabled){const id=hgView,k=up.dataset.up,i=+up.dataset.i,o=UPGRADES[k][i];const rec=career.up[id]=career.up[id]||{};rec.have=rec.have||{};rec.have[k]=rec.have[k]||[];
+    const owned=i===0||rec.have[k].includes(i);if(!owned){if(career.credits<o.cost){$('hgHint').textContent='Not enough credits for '+o.name+'.';return;}career.credits-=o.cost;rec.have[k].push(i);}
+    rec[k]=i;saveCareer();if(id===career.selected)loadPlayerAircraft(id);renderHangar();}});
+on('bHangarFly',()=>{const id=hgView,A=AIRCRAFT[id];if(!career.owned.includes(id)){if(career.credits<A.price)return;career.credits-=A.price;career.owned.push(id);career.selected=id;saveCareer();loadPlayerAircraft(id);renderHangar();return;}
+  if(id!==career.selected){career.selected=id;saveCareer();loadPlayerAircraft(id);}$('bFly').click();});
+/* career */
+let crSel=0;
+function showCareer(){crSel=Math.min(career.chapter,CHAPTERS.length-1);renderCareer();show('careerCard');}
+function renderCareer(){$('crCredits').textContent=career.credits;
+  $('crList').innerHTML=CHAPTERS.map((c,i)=>{const lock=i>career.chapter,done=i<career.chapter;return `<div class="chap${i===crSel?' sel':''}${lock?' lock':''}${done?' done':''}" data-ch="${i}"><span class="n">${done?'✓':i+1}</span><span><b>${c.name}</b><br><small>Heat ${c.heat}${c.goal==='survive'?' · survive '+c.time+' s':c.goal==='endless'?' · endless':''}</small></span><small>${lock?'locked':c.reward?'+'+c.reward+' cr':'bounty'}</small></div>`;}).join('');
+  $('crBrief').textContent=CHAPTERS[crSel].brief+' Flying: '+AIRCRAFT[career.selected].name+'.';}
+$('crList').addEventListener('click',e=>{const c=e.target.closest('[data-ch]');if(!c)return;const i=+c.dataset.ch;if(i>career.chapter)return;crSel=i;renderCareer();});
+on('bCareer',showCareer);on('bCareerBack',back);on('bCareerHangar',showHangar);
+on('bCareerGo',()=>{G.mode='pursuit';pursuit.chapter=crSel;document.querySelectorAll('[data-mode]').forEach(b=>b.textContent='Pursuit');reset();$('bFly').click();});
+on('bPurAgain',()=>{G.flying=true;G.crashed=false;reset();});on('bPurCareer',showCareer);on('bPurHangar',showHangar);on('bPurMenu',toMenu);
+function refreshMenu(){$('menuCredits').textContent=career.credits+' cr';const c=CHAPTERS[Math.min(career.chapter,CHAPTERS.length-1)];$('careerSub').textContent='Chapter '+(Math.min(career.chapter,CHAPTERS.length-1)+1)+': '+c.name+' · '+AIRCRAFT[career.selected].name;}
 const TELE=['full','minimal','off'];
 function cycleTelemetry(){settings.tele=TELE[(TELE.indexOf(settings.tele||'full')+1)%3];applyTelemetry();saveSettings();}
 function applyTelemetry(){const m=settings.tele||'full';$('hud').classList.toggle('minimal',m==='minimal');$('hud').classList.toggle('hidden',m==='off');document.querySelectorAll('[data-tele]').forEach(b=>b.textContent='Telemetry: '+m);}
@@ -95,14 +131,12 @@ function showLog(){const L=logbook;$('logStats').innerHTML=[['Flights',L.flights
 const STABN=['Stab off','Assist','Self-level'];
 function cycleStab(){if(dev&&dev.map.stab.src){say('Stabiliser is on a transmitter switch.','warn','stabsw',3);return;}G.kStab=(G.kStab+1)%3;settings.stab=G.kStab;saveSettings();applyStabLabel();}
 function applyStabLabel(){document.querySelectorAll('[data-stab]').forEach(b=>{b.textContent=STABN[G.stab];b.classList.toggle('on',G.stab>0);});}
-function setMode(m){G.mode=m;document.querySelectorAll('[data-mode]').forEach(b=>b.textContent=m==='free'?'Freefly':'Gates');reset();}
+function setMode(m){G.mode=m;document.querySelectorAll('[data-mode]').forEach(b=>b.textContent=m==='free'?'Freefly':m==='gates'?'Gates':'Pursuit');reset();}
 
 /* ---------- wiring ---------- */
-const on=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
-const onAll=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener('click',fn));
 on('bFly',()=>{G.started=true;if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();if(MOBILE&&!pad)setSticks(true);G.preflight={ail:false,ele:false,rud:false,wind:false};show('preCard');});
 on('bHangar',showHangar);on('bMenuTx',()=>openTx(false));on('bMenuLog',showLog);on('bMenuField',()=>show('fieldCard'));
-on('bHangarFly',()=>{$('bFly').click();});on('bHangarBack',back);
+on('bHangarBack',back);
 on('bTxWizard',()=>startWizard(0));on('bTxBack',()=>{wiz.on=false;swCap=null;$('wiz').hidden=true;back();});
 on('bClear',startFlight);on('bSkipPre',startFlight);on('bPreTx',()=>openTx(false));on('bPreBack',back);
 on('bAgain',reset);on('bLandAgain',reset);on('bLandLog',showLog);on('bWinGo',hide);on('bWinAgain',reset);on('bCrashMenu',toMenu);on('bLandMenu',toMenu);

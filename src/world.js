@@ -2,7 +2,7 @@
 const GATES=[[0,10,-120,0],[60,14,-140,Math.PI/2],[95,12,-70,Math.PI*0.75],[55,16,-10,Math.PI],[-55,11,-20,Math.PI*1.3],[-85,14,-90,Math.PI*1.6]];
 const gateMeshes=[],gateObjs=[];
 const gateM=lam(0xF26522), gateDim=lam(0x7a5a4a), gateDone=lam(0x5FD38D);
-GATES.forEach(g=>{const grp=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(3.5,0.15,10,36),gateDim);ring.castShadow=true;grp.add(ring);const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,g[1]-3.5,6),matBlack);pole.position.y=-(g[1]-3.5)/2-3.5;grp.add(pole);grp.position.set(g[0],g[1],g[2]);grp.rotation.y=g[3];grp.visible=false;scene.add(grp);gateMeshes.push(ring);const n=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),g[3]);gateObjs.push({pos:new THREE.Vector3(g[0],g[1],g[2]),n,grp});});
+GATES.forEach(g=>{const grp=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(3.5,0.15,10,36),gateDim);ring.castShadow=true;grp.add(ring);const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,g[1]-3.5,6),lam(0x202429));pole.position.y=-(g[1]-3.5)/2-3.5;grp.add(pole);grp.position.set(g[0],g[1],g[2]);grp.rotation.y=g[3];grp.visible=false;scene.add(grp);gateMeshes.push(ring);const n=new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),g[3]);gateObjs.push({pos:new THREE.Vector3(g[0],g[1],g[2]),n,grp});});
 const gate={i:0,t0:0,running:false,lastD:0};
 
 /* ---------- environment ---------- */

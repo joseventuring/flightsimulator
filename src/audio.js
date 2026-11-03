@@ -1,18 +1,37 @@
-/* ---------- sound ---------- */
-/* buses (audio-design): master <- motor, wind, alerts. Slider squared before gain. */
+/* ---------- sound (audio-design skill): buses master <- motor, wind, warden, alerts. Slider squared before gain. ----------
+   Motor model: rpm = KV x pack voltage x throttle x load factor. The tone you hear from an electric RC plane is the
+   blade-pass frequency (rpm/60 x 2 blades) plus the brushless whine at the electrical frequency (7 pole pairs).
+   In pilot view the sound falls off with distance and loses its top end, the way it does at the field. */
 let audio=null,beepT=0;
 function masterGain(){const s=settings.vol/100;return s*s;}
 function initAudio(){try{const ctx=new (window.AudioContext||window.webkitAudioContext)();const master=ctx.createGain();master.gain.value=masterGain();master.connect(ctx.destination);
-  const motor=ctx.createGain();motor.gain.value=0;motor.connect(master);const o1=ctx.createOscillator(),o2=ctx.createOscillator(),o3=ctx.createOscillator();o1.type='sawtooth';o2.type='square';o2.detune.value=7;o3.type='triangle';const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;o1.connect(f);o2.connect(f);o3.connect(f);f.connect(motor);o1.start();o2.start();o3.start();
+  const pan=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();pan.connect(master);
+  const motor=ctx.createGain();motor.gain.value=0;const air=ctx.createBiquadFilter();air.type='lowpass';air.frequency.value=4000;motor.connect(air);air.connect(pan);
+  const blade=ctx.createOscillator();blade.type='sawtooth';const bladeG=ctx.createGain();bladeG.gain.value=0.55;blade.connect(bladeG);bladeG.connect(motor);
+  const sub=ctx.createOscillator();sub.type='square';sub.detune.value=9;const subG=ctx.createGain();subG.gain.value=0.22;sub.connect(subG);subG.connect(motor);
+  const whine=ctx.createOscillator();whine.type='sine';const whineG=ctx.createGain();whineG.gain.value=0.07;whine.connect(whineG);whineG.connect(motor);
+  [blade,sub,whine].forEach(o=>o.start());
   const windG=ctx.createGain();windG.gain.value=0;windG.connect(master);const nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const ns=ctx.createBufferSource();ns.buffer=nb;ns.loop=true;const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=600;bp.Q.value=0.6;ns.connect(bp);bp.connect(windG);ns.start();
+  const warden=ctx.createGain();warden.gain.value=0;const wPan=ctx.createStereoPanner?ctx.createStereoPanner():ctx.createGain();warden.connect(wPan);wPan.connect(master);
+  const wo=ctx.createOscillator();wo.type='sawtooth';wo.frequency.value=520;const wf=ctx.createBiquadFilter();wf.type='lowpass';wf.frequency.value=1400;wo.connect(wf);wf.connect(warden);wo.start();
+  const siren=ctx.createOscillator();siren.type='triangle';const sirenG=ctx.createGain();sirenG.gain.value=0;siren.connect(sirenG);sirenG.connect(wPan);siren.start();
   const alerts=ctx.createGain();alerts.gain.value=0.9;alerts.connect(master);
-  audio={ctx,master,motor,o1,o2,o3,wind:windG,windF:bp,alerts};}catch(e){audio=null;}}
+  audio={ctx,master,pan,motor,air,blade,sub,whine,wind:windG,windF:bp,alerts,warden,wPan,wo,siren,sirenG};}catch(e){audio=null;}}
 function tone(freq,dur,type,vol,bus){if(!audio)return;const o=audio.ctx.createOscillator(),g=audio.ctx.createGain();o.type=type||'square';o.frequency.value=freq*(1+(Math.random()-0.5)*0.06);g.gain.value=vol;g.gain.setTargetAtTime(0,audio.ctx.currentTime+dur*0.6,dur*0.2);o.connect(g);g.connect(bus||audio.alerts);o.start();o.stop(audio.ctx.currentTime+dur);}
 function beep(){if(G.sound)tone(2200,0.12,'square',0.05);}
 function chime(){if(G.sound){tone(880,0.18,'sine',0.06);setTimeout(()=>tone(1320,0.22,'sine',0.05),90);}}
 function thud(k){if(G.sound)tone(70+40*k,0.25,'triangle',0.12*k);}
-function updateAudio(dt){if(!audio)return;const on=G.sound&&!G.crashed&&!G.landed&&!G.paused;const rpm=st.thr*(st.volt/12.6)*2300*12.6/60;const f=40+rpm*0.09+st.V*1.5;const now=audio.ctx.currentTime;audio.o1.frequency.setTargetAtTime(f,now,0.05);audio.o2.frequency.setTargetAtTime(f*0.5,now,0.05);audio.o3.frequency.setTargetAtTime(f*2.01,now,0.05);audio.motor.gain.setTargetAtTime(on?0.02+st.thr*0.08:0,now,0.05);
-  const w=clamp((st.V-6)/22,0,1);audio.wind.gain.setTargetAtTime(on?w*w*(G.cam==='fpv'?0.25:0.07):0,now,0.1);audio.windF.frequency.setTargetAtTime(300+st.V*40,now,0.1);
+const _ap=new THREE.Vector3(),_ar=new THREE.Vector3();
+function panFor(pos){_ap.copy(pos).sub(camera.position);const d=_ap.length();_ar.set(1,0,0).applyQuaternion(camera.quaternion);return {d,pan:d>0.01?clamp(_ap.dot(_ar)/d,-1,1)*0.8:0};}
+function updateAudio(dt){if(!audio)return;const on=G.sound&&!G.crashed&&!G.landed&&!G.paused&&G.view==='fly';const now=audio.ctx.currentTime;
+  const rpm=2300*Math.max(st.volt,0)*st.thr*0.78;const rot=rpm/60;const bp=Math.max(rot*2,30);
+  audio.blade.frequency.setTargetAtTime(bp,now,0.04);audio.sub.frequency.setTargetAtTime(bp*0.5,now,0.04);audio.whine.frequency.setTargetAtTime(Math.max(rot*7,60),now,0.04);
+  const fp=panFor(st.pos);const far=G.cam==='pilot'?1/(1+fp.d/18):1;const lvl=(0.015+st.thr*0.09)*far;
+  audio.motor.gain.setTargetAtTime(on?lvl:0,now,0.05);audio.air.frequency.setTargetAtTime(G.cam==='pilot'?clamp(9000/(1+fp.d/25),700,9000):6000,now,0.1);
+  if(audio.pan.pan)audio.pan.pan.setTargetAtTime(G.cam==='pilot'?fp.pan:0,now,0.05);
+  const w=clamp((st.V-6)/22,0,1);audio.wind.gain.setTargetAtTime(on?w*w*(G.cam==='fpv'?0.25:G.cam==='chase'?0.12:0.03):0,now,0.1);audio.windF.frequency.setTargetAtTime(300+st.V*40,now,0.1);
+  // wardens: engine drone and, while a pursuit is hot, a two-tone siren
+  let wl=0,ws=0,wp=0;if(typeof wardens!=='undefined'&&wardens.length&&pursuit.active){let best=1e9;wardens.forEach(W=>{const r=panFor(W.pos);if(r.d<best){best=r.d;wp=r.pan;}});wl=0.05/(1+best/30);ws=pursuit.heat>0?0.035/(1+best/40):0;}
+  audio.warden.gain.setTargetAtTime(on?wl:0,now,0.1);audio.sirenG.gain.setTargetAtTime(on?ws:0,now,0.1);audio.siren.frequency.setValueAtTime(Math.floor(now*1.6)%2?960:720,now);if(audio.wPan.pan)audio.wPan.pan.setTargetAtTime(wp,now,0.05);
   audio.master.gain.setTargetAtTime(masterGain(),now,0.05);
   if(G.sound&&on&&st.volt<AC.cells*AC.alarmV&&st.amp>3){beepT+=dt;if(beepT>0.8){beepT=0;beep();}}}
-

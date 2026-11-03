@@ -82,3 +82,10 @@ function swTick(){const f=FUNC[swCap.id];const d=detectChange(swCap.base,swCap.b
 function beepOk(){if(audio&&G.sound)tone(1320,0.08,'sine',0.05);try{navigator.vibrate&&navigator.vibrate(20);}catch(e){}}
 function onNewDevice(){if(G.flying&&$('overlay').hidden){say('New transmitter detected. Open Transmitter to set it up.','warn');return;}openTx(true);}
 function openTx(auto){show('txCard');refreshTx();if(auto&&pad&&stickCount()<4)startWizard(0);}
+
+/* built-in profiles: known transmitters map themselves the first time they are plugged in. Filled in from real hardware tests. */
+const TX_PROFILES=[];
+function profileFor(id){return TX_PROFILES.find(p=>p.match.test(id));}
+$('bCopyMap').addEventListener('click',()=>{if(!dev){txHint('No transmitter detected.','warn');return;}const out=JSON.stringify({device:devId,axes:padAxes.length,buttons:padButtons.length,map:dev.map,cal:dev.cal});const ta=$('mapOut');ta.hidden=false;ta.value=out;
+  const done=()=>txHint('Mapping copied. Paste it to Claude to build it in as an automatic profile.','good');
+  try{navigator.clipboard.writeText(out).then(done,()=>{ta.select();txHint('Select the text below and copy it.','');});}catch(e){ta.select();txHint('Select the text below and copy it.','');}});

@@ -21,7 +21,7 @@ function selectPad(){
   if(!best){pad=null;padAxes=[];padButtons=[];return false;}
   pad=best;padAxes=Array.from(pad.axes);padButtons=Array.from(pad.buttons).map(b=>typeof b==='object'?(b.pressed?1:(b.value||0)):(b>0.5?1:0));
   if(devId!==pad.id){devId=pad.id;dev=devices[devId];
-    if(!dev||!dev.map||dev.v!==4){dev=devices[devId]={v:4,map:defaultMap(),cal:{},sticksDone:false};saveDevices();onNewDevice();}
+    if(!dev||!dev.map||dev.v!==4){const pf=typeof profileFor==='function'&&profileFor(devId);dev=devices[devId]={v:4,map:pf?JSON.parse(JSON.stringify(pf.map)):defaultMap(),cal:{},sticksDone:!!pf};saveDevices();if(!pf)onNewDevice();else say&&st&&say('Recognised '+pf.name+'. Mapping loaded.','good');}
     FUNCS.forEach(f=>{if(!dev.map[f.id])dev.map[f.id]={src:null,inv:false,on:1};});}
   padAxes.forEach((v,i)=>{const k='a'+i;let c=dev.cal[k];if(!c)c=dev.cal[k]={min:v,max:v};if(v<c.min)c.min=v;if(v>c.max)c.max=v;});
   return true;

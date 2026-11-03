@@ -164,6 +164,43 @@ body.pre.touch #sticks{display:block!important;z-index:4}
 body.mobile.pre #overlay{justify-content:center;background:transparent}
 body.mobile.pre #overlay .card#preCard{width:min(calc(100vw - 2 * var(--stick) - 80px),520px);background:rgba(36,45,56,.95)}
 body.mobile.pre .ci small{display:none}
+.menu .btn.career{grid-column:1/3;border-color:var(--accent);min-height:52px}
+.credits{font-family:var(--mono);font-size:14px}.credits b{color:var(--warn);font-weight:600;font-size:18px}
+.acc{color:var(--accent)}
+.planes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.pl{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;cursor:pointer;background:var(--panel)}
+.pl.sel{border-color:var(--accent);background:rgba(242,101,34,.08)}
+.pl b{font-size:16px}.pl small{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.pl .tag{font-family:var(--mono);font-size:11.5px}.pl .tag.own{color:var(--good)}.pl .tag.lock{color:var(--warn)}
+.hgsel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:12px;align-items:start}
+.hgsel p{font-size:14px}
+.stats{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;font-family:var(--mono);font-size:12px}
+.stats span{color:var(--muted)}.stats b{font-weight:500;text-align:right;min-width:62px}
+.paint{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-family:var(--mono);font-size:12px}
+.paint .sw{display:flex;gap:5px;flex-wrap:wrap}
+.paint button{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0;min-height:0}
+.paint button.on{border-color:var(--fg);box-shadow:0 0 0 2px var(--accent)}
+.ups{display:flex;flex-direction:column;gap:5px}
+.up{display:grid;grid-template-columns:72px 1fr;gap:8px;align-items:center;font-family:var(--mono);font-size:12.5px}
+.up .opts{display:flex;gap:5px;flex-wrap:wrap}
+.up .opts .btn{font-size:12.5px;min-height:30px;padding:3px 9px}
+.up .opts .btn.have{border-color:var(--good);color:var(--good)}
+.up .opts .btn.cur{background:var(--good);color:var(--accent-ink);border-color:var(--good)}
+.chapters{display:flex;flex-direction:column;gap:5px}
+.chap{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.chap .n{font-family:var(--mono);color:var(--muted)}.chap b{font-size:16px}.chap small{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.chap.sel{border-color:var(--accent);background:rgba(242,101,34,.08)}.chap.lock{opacity:.45;cursor:default}.chap.done .n{color:var(--good)}
+.brief{font-size:15px;line-height:1.45;color:var(--fg);border-left:3px solid var(--accent);padding:4px 0 4px 12px}
+#purHud{display:flex;gap:10px;align-items:center;background:rgba(27,34,43,.86);border:1px solid var(--bad);border-radius:4px;padding:5px 10px;width:max-content;font-family:var(--mono);font-size:13px}
+#purHud .heat{color:var(--warn);letter-spacing:2px;font-size:15px}
+#purHud .pb{display:flex;flex-direction:column;gap:2px;width:84px}
+#purHud .bar{height:6px;display:block;width:100%}
+body.mobile.pursuing #marshal{top:max(92px,calc(env(safe-area-inset-top,0px) + 88px))}
+#purHud .goal{min-width:0;white-space:nowrap}#purHud .bust i{background:var(--bad)}#purHud .cool i{background:var(--good)}
+#purHud b{color:var(--warn)}#purHud .goal{color:var(--fg)}
+body.mobile #purHud{font-size:11.5px;gap:8px;padding:3px 8px}body.mobile #purHud .pb{width:64px}
+@media (max-width:620px){.planes{grid-template-columns:1fr}.hgsel{grid-template-columns:1fr}}
+@media (max-height:520px){.planes{grid-template-columns:repeat(3,1fr)}}
 #flash{position:absolute;inset:0;background:#F7F4EE;opacity:0;pointer-events:none;transition:opacity .35s ease-out}
 #flash.on{opacity:.75;transition:none}
 #rotate{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));z-index:20}
@@ -250,6 +287,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
         </div>
       </div>
     </div>
+    <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
     <div id="status"><b>CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
   </div>
@@ -281,11 +319,12 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>Flight Sim</span></h1>
-        <div class="sub">CraycleCub V2 · Kurianad strip, RWY 00 · v0.6</div>
+        <div class="sub">CraycleCub V2 · Kurianad strip, RWY 00 · v0.7</div>
       </div>
-      <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span></div>
+      <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
-        <button class="btn primary" id="bFly">Fly<small>Preflight checks, then the strip</small></button>
+        <button class="btn primary" id="bFly">Practice flight<small>Preflight checks, then the strip</small></button>
+        <button class="btn career" id="bCareer">Career: Coast Wardens<small id="careerSub">Chapter 1 · pursuit</small></button>
         <button class="btn" id="bHangar">Hangar<small>The aircraft and its numbers</small></button>
         <button class="btn" id="bMenuTx">Transmitter<small>Detect, map, test</small></button>
         <button class="btn" id="bMenuField">Field and feel<small>Wind, rates, sound</small></button>
@@ -295,10 +334,35 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     </div>
 
     <div class="card" id="hangarCard" hidden>
-      <h2>Hangar</h2>
-      <p>The aircraft the flight model is tuned to.</p>
-      <div class="sheet" id="sheet"></div>
-      <div class="row"><button class="btn primary" id="bHangarFly">Preflight and fly</button><button class="btn" id="bHangarBack">Back</button></div>
+      <div class="txhead"><h2>Hangar</h2><span class="credits"><span class="lbl">Credits</span> <b id="hgCredits">0</b></span></div>
+      <div class="planes" id="hgPlanes"></div>
+      <div class="hgsel">
+        <div><div class="lbl" id="hgName">CraycleCub V2</div><p id="hgBlurb"></p></div>
+        <div class="stats" id="hgStats"></div>
+      </div>
+      <div class="lbl">Paint</div>
+      <div class="paint" id="hgPaint"></div>
+      <div class="lbl">Upgrades</div>
+      <div class="ups" id="hgUps"></div>
+      <details id="hgSheetWrap"><summary class="lbl">Data sheet</summary><div class="sheet" id="sheet" style="margin-top:8px"></div></details>
+      <div class="hint" id="hgHint"></div>
+      <div class="row"><button class="btn primary" id="bHangarFly">Fly this one</button><button class="btn" id="bHangarBack">Back</button></div>
+    </div>
+
+    <div class="card" id="careerCard" hidden>
+      <div class="txhead"><h2>Career: <span class="acc">Coast Wardens</span></h2><span class="credits"><span class="lbl">Credits</span> <b id="crCredits">0</b></span></div>
+      <p>Monsoon season on the Kottayam coast. The Coast Wardens, a fictional patrol squadron, have started chasing every model that flies near the backwaters. Outfly them, bank the bounty, build your hangar.</p>
+      <div class="chapters" id="crList"></div>
+      <div id="crBrief" class="brief"></div>
+      <div class="row"><button class="btn primary" id="bCareerGo">Start chapter</button><button class="btn" id="bCareerHangar">Hangar</button><button class="btn" id="bCareerBack">Back</button></div>
+    </div>
+
+    <div class="card" id="purCard" hidden>
+      <h1 id="purTitle">Escaped</h1>
+      <p id="purWhy"></p>
+      <div class="stat"><div><span class="lbl">Pursuit</span><b id="purTime">0:00</b></div><div><span class="lbl">Bounty</span><b id="purBounty">0</b></div><div><span class="lbl">Earned</span><b id="purEarned">0</b></div></div>
+      <div class="kv"><b>Credits</b><span id="purCredits">0</span></div>
+      <div class="row"><button class="btn primary" id="bPurAgain">Run it again</button><button class="btn" id="bPurCareer">Career</button><button class="btn" id="bPurHangar">Hangar</button><button class="btn" id="bPurMenu">Menu</button></div>
     </div>
 
     <div class="card" id="txCard" hidden>
@@ -317,7 +381,8 @@ body.mobile #marshal{max-width:min(420px,46vw)}
         <span>ELE <span class="trim"><button class="btn mini" data-trim="ele" data-d="-1">−</button><b id="trim-ele">0</b><button class="btn mini" data-trim="ele" data-d="1">+</button></span></span>
         <span>RUD <span class="trim"><button class="btn mini" data-trim="rud" data-d="-1">−</button><b id="trim-rud">0</b><button class="btn mini" data-trim="rud" data-d="1">+</button></span></span>
       </div>
-      <div class="row"><button class="btn mini" id="bTrim0">Zero trims</button></div>
+      <div class="row"><button class="btn mini" id="bTrim0">Zero trims</button><button class="btn mini" id="bCopyMap">Copy mapping</button></div>
+      <textarea id="mapOut" readonly hidden style="width:100%;height:70px;font-family:var(--mono);font-size:11px;background:var(--panel-2);color:var(--fg);border:1px solid var(--line);border-radius:6px"></textarea>
     </div>
 
     <div class="card" id="preCard" hidden>
@@ -442,11 +507,13 @@ const G={mode:'free',cam:'pilot',view:'fly',sound:false,started:false,flying:fal
 const IN={ail:0,ele:0,rud:0,thr:0,flap:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
 
 /*__SCENE__*/
+/*__AIRCRAFT__*/
 /*__MESH__*/
 /*__FX__*/
 /*__WORLD__*/
 /*__INPUT__*/
 /*__TXSETUP__*/
+/*__PURSUIT__*/
 /*__AUDIO__*/
 /*__HUD__*/
 /*__FLOW__*/
@@ -477,7 +544,7 @@ function frame(now){
     if(st.airborne&&!G.flightStart){G.flightStart=st.time;say('Airborne. Climb straight ahead to 30 m before the first turn.','good');}
     if(crash)endFlight('crash',crash);
     else{
-      marshal();
+      if(G.mode!=='pursuit')marshal();updatePursuit(dt);
       if(G.mode==='gates')checkGate();
       if(st.airborne&&st.onGround){if(st.V<0.8){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
         if(st.touchdown&&!st.touchdown.said){st.touchdown.said=true;haptic(st.touchdown.sink>1.8?80:30);feedback(st.touchdown.sink>1.8?'medium':'small',st.pos.x,0.05,st.pos.z);thud(clamp(st.touchdown.sink/2.6,0.15,0.8));say('Down. Sink '+st.touchdown.sink.toFixed(1)+' m/s at '+(st.touchdown.speed*3.6).toFixed(0)+' km/h.',st.touchdown.sink>1.8?'warn':'good');}}
@@ -491,10 +558,10 @@ function frame(now){
   $('thrRail').style.height=Math.round(IN.rawThr*100)+'%';
   sockArm.rotation.y=-settings.wdir*Math.PI/180+Math.PI/2+Math.PI;sockArm.rotation.z=-clamp(0.9-settings.wind*0.14,0,0.9);
   placeSun(st.pos);
-  updateCamera(dt);updateMarker();updateHUD(dt);updateAudio(dt);
+  updateCamera(dt);updateMarker();updateHUD(dt);drawPursuitHud();updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={plane,THREE,surf,renderer,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+window.JG={plane,THREE,get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
 showPad();show('menuCard');
 requestAnimationFrame(frame);
 })();

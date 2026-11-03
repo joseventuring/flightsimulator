@@ -42,3 +42,23 @@ Reported: rudder dead, elevator reversed, elevator surface on the model moving t
 Also new: Hangar screen with the CraycleCub V2 data sheet the model is tuned to, flap physics in the core (for aircraft that have them), telemetry overlay full/minimal/off (T), main menu, screen stack with Back. Source split into `src/*.js` modules stitched by `build.py`.
 
 Scores: transmitter 96 to 97 (verified end to end in a headless run with a reversed elevator and rudder on axis 4), visual design 91 to 92 (hinged surfaces), code quality 91 to 93 (modules). Average 93.0.
+
+## v0.5 (4 Nov 2026): deep audit after JJ's v0.4 test, phone-first
+
+JJ reported: flight not running, options not clickable (Reverse did nothing, no next step), nothing moving on the plane, an unmovable "3rd control", rudder on 4 not working, design still boxed. Reproduced each one in a headless browser before fixing.
+
+| # | Finding | Root cause | Fix | Verified by |
+|---|---|---|---|---|
+| 1 | Flight dead, nothing moves, rudder dead | If the guided setup was left half-done, the sim ignored the transmitter entirely and fell back to keyboard | Every mapped control now works on its own; unmapped ones fall back to touch or keyboard | Test: 3 sticks mapped, throttle from TX reaches 33 km/h |
+| 2 | Reverse "did nothing", no next option | Toggle worked but showed no state; the wizard needed a manual "Looks right" | Buttons read Normal / Reversed; wizard sets direction from how you moved the stick and advances when you let go | Test: 4 sticks mapped in sequence, reversed elevator detected and corrected |
+| 3 | Wizard skipped a step on slow frames | Waited a fixed frame count before listening | Time-based settle, and a move made early is still caught | Same test on software rendering at ~5 fps |
+| 4 | Surfaces moved the wrong way | Surfaces hinged at their centre with wrong signs (v0.3) | Real hinge lines, sign conventions documented | Geometry test: right stick, right aileron TE up; pull, elevator TE up; right rudder, TE right |
+| 5 | Boxed plane | Placeholder boxes | Lofted fuselage, Clark Y airfoil wings cut at the true hinge lines, tapered tail, struts, tyres, spinner, JG mark | Screenshot |
+| 6 | Whole page squashed into one column | CSS class collision: `body.menu` matched the `.menu` button grid | Renamed to `in-menu` | Layout measured at 863 x 360 and 1280 x 800 |
+| 7 | Phone preflight could never clear | Touch sticks were hidden behind the checklist | Sticks stay live in both corners, checklist between them | Touch test on emulated Pixel 7 |
+| 8 | Self-level rolled the wrong way | Bank sign opposite to aileron sign | Corrected; tested in the physics harness | 40 deg bank levels in under 2 s; full stick holds 44 deg |
+| 9 | Throttle cut could silently block flight | No warning | Preflight check, red THROTTLE CUT banner | Test |
+
+New for the phone: landscape layout with sticks in the corners (throttle stays where you leave it, rudder and right stick spring back), readout strip, Self-level / Assist / Off stabiliser (default Self-level on phone), model marker ring and stronger zoom when the plane is far, fullscreen and landscape lock on Fly, rotate prompt in portrait, vibration on touchdown and crash, add-to-home-screen manifest, lighter rendering on mobile.
+
+Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 90 (first version, awaiting JJ's hands-on), aircraft visuals 88 (procedural, the real STL mesh would take it past 95), UI 92, robustness 94.

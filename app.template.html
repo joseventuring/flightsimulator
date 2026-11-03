@@ -2,53 +2,65 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-/* Layout: full-bleed field; telemetry cluster top-left (numbers, attitude ball, field map, battery); marshal strip bottom-left; dock bottom-right; transmitter drawer from the right. One committed dark look. */
+/* Layout: full-bleed field. Desktop: telemetry cluster top-left, dock bottom-right, setup screens docked right with the aircraft on the left.
+   Phone landscape: readout strip top-left, three controls top-right, sticks in the bottom corners, setup screens full width. One committed dark look. */
 :root{
   --bg:#1B222B; --panel:#242D38; --panel-2:#303B48; --line:#45515F; --line-2:#5A6676;
   --fg:#F7F4EE; --muted:#A3AEBA; --dim:#6E7A88; --accent:#F26522; --accent-ink:#1B222B;
-  --good:#5FD38D; --warn:#F5C542; --bad:#E8503A; --sky:#B9CBDB; --earth:#6E5A3E;
+  --good:#5FD38D; --warn:#F5C542; --bad:#E8503A;
   --display:'Rajdhani',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --stick:clamp(112px,34vh,168px);
   color-scheme:dark;
 }
 html,body{height:100%;margin:0}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--fg);font-family:var(--display);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 #app{position:relative;width:100%;height:100%;overflow:hidden}
 #c{display:block;width:100%;height:100%}
 button{font:inherit;color:inherit}
-.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-weight:600;font-size:15px;letter-spacing:.02em;cursor:pointer;min-height:40px}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-weight:600;font-size:15px;letter-spacing:.02em;cursor:pointer;min-height:40px;touch-action:manipulation}
 .btn:hover{background:var(--panel-2)}
+.btn:active{transform:translateY(1px)}
 .btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.on{border-color:var(--accent);color:var(--accent)}
-.btn.mini{padding:4px 10px;min-height:30px;font-size:13px}
-.btn:disabled{opacity:.45;cursor:default}
+.btn.mini{padding:4px 10px;min-height:32px;font-size:13px}
+.btn:disabled{opacity:.4;cursor:default}
 .lbl{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.hint{font-size:13.5px;color:var(--muted);line-height:1.4}
+.hint.good{color:var(--good)}.hint.warn{color:var(--warn)}.hint.wait{color:var(--accent)}
+kbd{font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+.ok{color:var(--good)}.no{color:var(--warn)}.bad-t{color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar{height:7px;background:var(--panel-2);border-radius:2px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;width:0;background:var(--accent)}
+.bar.ctr i{position:absolute;top:0;left:50%}
+.bar.ctr:after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-2)}
 
-/* HUD */
+/* ---- HUD ---- */
 #hud{position:absolute;top:0;left:0;padding:max(12px,env(safe-area-inset-top,0px)) 0 0 max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .cells{display:flex;gap:6px;align-items:stretch}
-.cell{background:rgba(27,34,43,.82);border:1px solid var(--line);border-radius:4px;padding:5px 10px 4px;min-width:78px;display:flex;flex-direction:column;justify-content:space-between}
+.cell{background:rgba(27,34,43,.8);border:1px solid var(--line);border-radius:4px;padding:5px 10px 4px;min-width:74px;display:flex;flex-direction:column;justify-content:space-between}
 .cell.primary{border-left:3px solid var(--accent)}
 .cell .v{font-family:var(--mono);font-size:24px;font-weight:500;line-height:1.05;font-variant-numeric:tabular-nums}
 .cell .u{font-size:11px;color:var(--muted);margin-left:3px;font-family:var(--display)}
 .cell.small .v{font-size:17px}
 .cell .v.warn{color:var(--warn)}.cell .v.bad{color:var(--bad)}
+.cell.bat{display:none}
 .inst{display:flex;gap:6px;align-items:flex-start}
-canvas.gauge{background:rgba(27,34,43,.82);border:1px solid var(--line);border-radius:4px;display:block}
+canvas.gauge{background:rgba(27,34,43,.8);border:1px solid var(--line);border-radius:4px;display:block}
 .stack{display:flex;flex-direction:column;gap:6px}
-.kvs{background:rgba(27,34,43,.82);border:1px solid var(--line);border-radius:4px;padding:5px 10px;display:grid;grid-template-columns:auto auto;gap:1px 10px;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;min-width:140px}
-.kvs span{color:var(--muted)}.kvs b{font-weight:500;text-align:right}
-.kvs b.big{font-size:20px;line-height:1.1}
-.bar{height:7px;background:var(--panel-2);border-radius:2px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;background:var(--accent)}
+.kvs{background:rgba(27,34,43,.8);border:1px solid var(--line);border-radius:4px;padding:5px 10px;display:grid;grid-template-columns:auto auto;gap:1px 10px;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;min-width:140px}
+.kvs span{color:var(--muted)}.kvs b{font-weight:500;text-align:right}.kvs b.big{font-size:20px;line-height:1.1}
 #status{font-family:var(--mono);font-size:12px;color:var(--muted);background:rgba(27,34,43,.6);padding:4px 8px;border-radius:4px;width:max-content;max-width:72vw}
 #status b{color:var(--fg);font-weight:500}
-#gatebox{display:none;gap:12px;align-items:center;background:rgba(27,34,43,.82);border:1px solid var(--line);border-radius:4px;padding:5px 10px;width:max-content;font-family:var(--mono);font-size:14px}
+#hud.minimal .inst,#hud.minimal #status{display:none}
+#hud.hidden{display:none}
+#gatebox{display:none;gap:12px;align-items:center;background:rgba(27,34,43,.8);border:1px solid var(--line);border-radius:4px;padding:5px 10px;width:max-content;font-family:var(--mono);font-size:14px}
 #gatebox .n{color:var(--accent);font-weight:600}
+#banner{position:absolute;top:max(12px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--bad);color:var(--fg);font-weight:700;letter-spacing:.12em;padding:6px 14px;border-radius:4px;pointer-events:none}
 
-/* Marshal */
+/* marshal */
 #marshal{position:absolute;left:0;bottom:0;padding:0 0 max(14px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));pointer-events:none;max-width:min(520px,60vw);display:flex;flex-direction:column;gap:3px}
 #marshal .m{font-family:var(--mono);font-size:13px;background:rgba(27,34,43,.82);border-left:3px solid var(--line-2);padding:4px 9px;border-radius:0 4px 4px 0;color:var(--muted);width:max-content;max-width:100%}
 #marshal .m b{color:var(--fg);font-weight:500}
@@ -57,96 +69,154 @@ canvas.gauge{background:rgba(27,34,43,.82);border:1px solid var(--line);border-r
 #marshal .m.good{border-left-color:var(--good)}#marshal .m.good b{color:var(--good)}
 #marshal .m:last-child{color:var(--fg)}
 
-/* Dock */
-#dock{position:absolute;right:0;bottom:0;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;padding:0 max(16px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) 16px;max-width:48vw}
+/* dock (desktop) and phone controls */
+#dock{position:absolute;right:0;bottom:0;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;padding:0 max(16px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) 16px;max-width:52vw}
+#mtop{position:absolute;top:0;right:0;display:none;gap:6px;padding:max(8px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 0 0}
+#mtop .btn{min-height:38px;padding:6px 12px;background:rgba(36,45,56,.86)}
+#mmid{position:absolute;left:50%;bottom:max(10px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:none;gap:8px;align-items:center;font-family:var(--mono);font-size:13px;pointer-events:none}
+#mmid span{background:rgba(27,34,43,.82);border:1px solid var(--line);border-radius:4px;padding:4px 8px}
+#mmid .rate{border-color:var(--accent);color:var(--accent)}
 
-/* Touch sticks */
+/* touch sticks */
 #sticks{position:absolute;inset:0;pointer-events:none;display:none}
-#sticks.show{display:block}
-.stick{position:absolute;bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 60px);width:128px;height:128px;border-radius:50%;border:1.5px solid rgba(247,244,238,.35);background:rgba(27,34,43,.35);pointer-events:auto;touch-action:none}
-.stick.l{left:max(20px,env(safe-area-inset-left,0px))}
-.stick.r{right:max(20px,env(safe-area-inset-right,0px))}
-.stick .nub{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--accent);opacity:.9}
-.stick .tag{position:absolute;top:-20px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+body.touch #sticks{display:block}
+.stick{position:absolute;bottom:calc(max(14px,env(safe-area-inset-bottom,0px)) + 8px);width:var(--stick);height:var(--stick);border-radius:16px;border:1.5px solid rgba(247,244,238,.28);background:rgba(27,34,43,.32);pointer-events:auto;touch-action:none}
+.stick.l{left:max(18px,env(safe-area-inset-left,0px))}
+.stick.r{right:max(18px,env(safe-area-inset-right,0px))}
+.stick:before,.stick:after{content:"";position:absolute;background:rgba(247,244,238,.18)}
+.stick:before{left:50%;top:12%;bottom:12%;width:1px}.stick:after{top:50%;left:12%;right:12%;height:1px}
+.stick .nub{position:absolute;left:50%;top:50%;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;background:var(--fg);opacity:.85;box-shadow:0 0 0 3px rgba(242,101,34,.0)}
+.stick.active .nub{background:var(--accent);opacity:1}
+.stick .tag{position:absolute;top:-18px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.stick.l .rail{position:absolute;left:-12px;top:12%;bottom:12%;width:4px;border-radius:2px;background:rgba(247,244,238,.15);overflow:hidden}
+.stick.l .rail i{position:absolute;left:0;right:0;bottom:0;background:var(--accent)}
 
-/* Overlays */
-#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(27,34,43,.66);backdrop-filter:blur(3px);padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));overflow-y:auto}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px 24px;width:min(500px,100%);display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-.card h1{margin:0;font-size:32px;font-weight:700;letter-spacing:.01em;line-height:1;text-wrap:balance}
+/* overlay screens */
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(27,34,43,.55);padding:20px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px));overflow-y:auto}
+#overlay.side{justify-content:flex-end;background:transparent;pointer-events:none}
+#overlay.left{justify-content:flex-start;background:linear-gradient(90deg,rgba(27,34,43,.82) 0,rgba(27,34,43,.82) 40%,rgba(27,34,43,0) 75%)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 22px;width:min(500px,100%);display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.45);max-height:calc(100% - 8px);overflow-y:auto;pointer-events:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+#overlay.side .card{width:min(580px,100%);background:rgba(36,45,56,.97)}
+.card h1{margin:0;font-size:34px;font-weight:700;letter-spacing:.01em;line-height:1;text-wrap:balance}
 .card h1 span{color:var(--accent)}
-.card h2{margin:0;font-size:20px;font-weight:700}
-.card p{margin:0;color:var(--muted);line-height:1.45;font-size:15.5px;max-width:62ch}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card h2{margin:0;font-size:21px;font-weight:700}
+.card p{margin:0;color:var(--muted);line-height:1.45;font-size:15px;max-width:62ch}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-family:var(--mono);font-size:13px}
-.kv b{font-weight:500;color:var(--fg)}
-.kv span{color:var(--muted)}
-.ok{color:var(--good)}.no{color:var(--warn)}
-.bad-t{color:var(--bad)}
-kbd{font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
-.check{display:flex;flex-direction:column;gap:6px}
-.ci{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:6px;font-size:15px}
+.kv b{font-weight:500;color:var(--fg)}.kv span{color:var(--muted)}
+.check{display:flex;flex-direction:column;gap:5px}
+.ci{display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:15px}
 .ci .dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--line-2);justify-self:center}
-.ci.done{border-color:rgba(95,211,141,.5)}
-.ci.done .dot{background:var(--good);border-color:var(--good)}
-.ci small{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ci.done{border-color:rgba(95,211,141,.5)}.ci.done .dot{background:var(--good);border-color:var(--good)}
+.ci small{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
 .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.stat div{background:var(--panel-2);border-radius:6px;padding:8px 10px}
+.stat div{background:var(--panel-2);border-radius:6px;padding:8px 10px;min-width:0}
 .stat .lbl{display:block;margin-bottom:2px}
 .stat b{font-family:var(--mono);font-size:20px;font-weight:500}
-
-/* Drawer */
-#drawer{position:absolute;top:0;right:0;bottom:0;width:min(400px,100%);background:var(--panel);border-left:1px solid var(--line);padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) 16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;box-shadow:-20px 0 50px rgba(0,0,0,.4)}
-#drawer h2{margin:0;font-size:22px;font-weight:700}
-.sec{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
-.axes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;font-family:var(--mono);font-size:12px}
-.axes>div{display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:center;color:var(--muted)}
-input[type=range]{width:100%;accent-color:var(--accent)}
-.sl{display:grid;grid-template-columns:84px 1fr 56px;gap:10px;align-items:center;font-family:var(--mono);font-size:13px}
-.sl output{text-align:right;color:var(--muted)}
-.toggle{display:flex;gap:8px;align-items:center;font-size:15px}
-.hint{font-size:13px;color:var(--muted);line-height:1.4}
-#flash{position:absolute;inset:0;background:#F7F4EE;opacity:0;pointer-events:none;transition:opacity .35s ease-out}
-#flash.on{opacity:.75;transition:none}
-@media (prefers-reduced-motion:reduce){#flash{display:none}}
-#wiz{background:var(--panel-2);border:1px solid var(--accent);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
-#wiz b{font-size:17px}
-/* v0.4 additions */
-#overlay.side{justify-content:flex-end;background:transparent;backdrop-filter:none;pointer-events:none}
-#overlay.side .card{pointer-events:auto;width:min(560px,100%);max-height:calc(100% - 48px);overflow-y:auto;background:rgba(36,45,56,.96)}
-#hud.minimal .inst,#hud.minimal #status{display:none}
-#hud.hidden{display:none}
-body.hangar #hud,body.hangar #dock,body.hangar #marshal{display:none}
 .sheet{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-family:var(--mono);font-size:13px}
 .sheet span{color:var(--muted)}.sheet b{font-weight:500}
-.fntable{display:flex;flex-direction:column;gap:6px}
-.fntable.dim{opacity:.5}
-.fnrow{display:grid;grid-template-columns:150px 1fr auto auto auto;gap:6px;align-items:center;font-family:var(--mono);font-size:13px}
-.fnrow.off{opacity:.45}
-.fnrow .fnname{display:flex;flex-direction:column;line-height:1.15}.fnrow .fnname small{font-size:10.5px;color:var(--muted);font-family:var(--display)}
-.fnrow .bar{height:10px;position:relative}.fnrow .bar:after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-2)}
-.raw{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 12px;font-family:var(--mono);font-size:11.5px}
-.raw>div{display:grid;grid-template-columns:26px 1fr 40px;gap:6px;align-items:center;color:var(--muted)}
-.raw b{font-weight:400;text-align:right}
-#wiz{background:var(--panel-2);border:1px solid var(--accent);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-#wiz .lbl{color:var(--accent)}
-#wiz b{font-size:19px}
-.trimrow{display:grid;grid-template-columns:70px auto;gap:8px 14px;align-items:center;font-family:var(--mono);font-size:13px}
-.trimrow .trim{display:flex;gap:4px;align-items:center}.trimrow .trim b{min-width:34px;text-align:center;font-weight:500}
+
+/* menu */
+.menuhead{display:flex;flex-direction:column;gap:6px}
+.menuhead .sub{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
 .menu{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.menu .btn{min-height:48px}
-.menu .btn.primary{grid-column:1/3}
-@media (max-width:620px){
-  .fnrow{grid-template-columns:110px 1fr auto auto auto;font-size:12px}
-  #overlay.side{justify-content:center}
-  .menu{grid-template-columns:1fr}.menu .btn.primary{grid-column:auto}
-  .cell .v{font-size:18px}.cell{min-width:62px;padding:4px 7px 3px}.cell.small .v{font-size:14px}
-  .inst canvas.gauge{width:84px;height:84px}
-  .kvs{min-width:110px;font-size:11.5px}.kvs b.big{font-size:16px}
-  #dock{max-width:100%;gap:5px}.btn{padding:6px 9px;font-size:13px;min-height:34px}
-  #marshal{max-width:70vw}#marshal .m{font-size:11.5px}
-  #status{display:none}
+.menu .btn{min-height:48px;text-align:left;padding:8px 14px;display:flex;flex-direction:column;justify-content:center;gap:1px}
+.menu .btn small{font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
+.menu .btn.primary small{color:rgba(27,34,43,.75)}
+.menu .btn.primary{grid-column:1/3;min-height:56px;font-size:19px}
+
+/* transmitter */
+.txhead{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.fntable{display:flex;flex-direction:column;gap:5px}
+.fnrow{display:grid;grid-template-columns:132px 1fr auto auto;gap:6px;align-items:center;font-family:var(--mono);font-size:13px;padding:3px 6px;border-radius:6px;border:1px solid transparent}
+.fnrow.cur{border-color:var(--accent);background:rgba(242,101,34,.08)}
+.fnrow.ok .fnname:before{content:"●";color:var(--good);margin-right:6px;font-size:9px;vertical-align:2px}
+.fnrow.off{opacity:.42}
+.fnrow .fnname{display:flex;flex-direction:column;line-height:1.15;font-family:var(--display);font-size:15px;font-weight:600}
+.fnrow .fnname small{font-size:11.5px;color:var(--muted);font-family:var(--mono);font-weight:400}
+.fnrow .bar{height:10px}
+.btn.rev{min-width:88px}
+.btn.rev.on{border-color:var(--warn);color:var(--warn)}
+.chip{font-family:var(--mono);font-size:12px;padding:4px 8px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;justify-self:start}
+.chip.set{color:var(--fg)}.chip.on{border-color:var(--good);color:var(--good)}.chip.bad{border-color:var(--bad);color:var(--bad)}.chip.wait{border-color:var(--accent);color:var(--accent)}
+.raw{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px;font-family:var(--mono);font-size:11.5px}
+.raw>div{display:grid;grid-template-columns:26px 1fr 42px;gap:6px;align-items:center;color:var(--muted)}
+.raw>div.used span{color:var(--accent)}
+.raw b{font-weight:400;text-align:right}
+details summary{cursor:pointer;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary:before{content:"+ ";color:var(--accent)}
+details[open] summary:before{content:"− "}
+#wiz{background:var(--panel-2);border:1px solid var(--accent);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+#wiz .lbl{color:var(--accent)}
+#wiz b#wizTitle{font-size:22px;line-height:1}
+#wizText{font-size:16px;color:var(--fg);line-height:1.4}
+.trimrow{display:grid;grid-template-columns:auto auto auto;gap:8px 18px;align-items:center;font-family:var(--mono);font-size:13px;justify-content:start}
+.trim{display:flex;gap:4px;align-items:center}.trim b{min-width:30px;text-align:center;font-weight:500}
+.sl{display:grid;grid-template-columns:84px 1fr 56px;gap:10px;align-items:center;font-family:var(--mono);font-size:13px}
+.sl output{text-align:right;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.toggle{display:flex;gap:8px;align-items:center;font-size:15px}
+.sec{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
+body.hangar #hud,body.hangar #dock,body.hangar #marshal,body.hangar #mtop,body.hangar #mmid,body.hangar #sticks,body.in-menu #sticks,body.in-menu #mtop,body.in-menu #mmid,body.in-menu #hud,body.in-menu #dock,body.in-menu #marshal,body.in-menu #banner{display:none!important}
+
+#overlay{z-index:3}
+body.pre.touch #sticks{display:block!important;z-index:4}
+body.mobile.pre #overlay{justify-content:center;background:transparent}
+body.mobile.pre #overlay .card#preCard{width:min(calc(100vw - 2 * var(--stick) - 80px),520px);background:rgba(36,45,56,.95)}
+body.mobile.pre .ci small{display:none}
+#flash{position:absolute;inset:0;background:#F7F4EE;opacity:0;pointer-events:none;transition:opacity .35s ease-out}
+#flash.on{opacity:.75;transition:none}
+#rotate{position:absolute;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));z-index:20}
+#rotate .phone{width:46px;height:78px;border:3px solid var(--fg);border-radius:9px;position:relative;animation:tilt 2.4s ease-in-out infinite}
+#rotate .phone:after{content:"";position:absolute;bottom:5px;left:50%;width:12px;height:3px;margin-left:-6px;border-radius:2px;background:var(--accent)}
+@keyframes tilt{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (pointer:coarse){body:not(.portrait-ok) #rotate{display:flex}}
+
+/* ---- phone ---- */
+body.mobile #dock,body.mobile #status{display:none}
+body.mobile #mtop{display:flex}
+body.mobile.touch #mmid{display:flex}
+body.mobile #hud{padding:max(8px,env(safe-area-inset-top,0px)) 0 0 max(12px,env(safe-area-inset-left,0px));gap:5px}
+body.mobile .cells{gap:4px}
+body.mobile .cell{min-width:0;padding:3px 8px 2px}
+body.mobile .cell .v{font-size:19px}
+body.mobile .cell.small .v{font-size:15px}
+body.mobile .cell .lbl{font-size:9px;letter-spacing:.1em}
+body.mobile .cell.hdg,body.mobile .cell.load{display:none}
+body.mobile .cell.bat{display:flex}
+body.mobile .inst .stack,body.mobile #map{display:none}
+body.mobile #adi{width:84px;height:84px}
+body.mobile #hud.minimal .inst{display:none}
+body.mobile #marshal{left:50%;transform:translateX(-50%);bottom:auto;top:max(54px,calc(env(safe-area-inset-top,0px) + 50px));padding:0;max-width:min(440px,52vw);align-items:center}
+body.mobile #marshal .m{font-size:12px;padding:3px 8px}
+body.mobile #marshal .m:not(:last-child){display:none}
+body.mobile #overlay.left{background:rgba(27,34,43,.5);justify-content:center}
+body.mobile #menuCard{width:min(760px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:10px 18px;align-items:start}
+body.mobile #menuCard .menuhead,body.mobile #menuCard .kv{grid-column:1}
+body.mobile #menuCard .menu{grid-column:2;grid-row:1 / span 3;grid-template-columns:1fr 1fr}
+body.mobile #menuCard .menu .btn.primary{grid-column:1/3}
+body.mobile #menuCard .kbdhelp{display:none}
+body.mobile #menuCard .kv{grid-template-columns:1fr}
+body.mobile #marshal{max-width:min(420px,46vw)}
+@media (max-height:520px){
+  .card{padding:14px 16px;gap:9px}
+  .card h1{font-size:28px}
+  .card p{font-size:14px}
+  .menu{grid-template-columns:1fr 1fr 1fr}.menu .btn.primary{grid-column:1/4;min-height:48px}
+  .menu .btn{min-height:44px}
+  #overlay{padding-top:10px;padding-bottom:10px}
+  #overlay.side{justify-content:center;background:rgba(27,34,43,.4)}
+  #overlay.side .card{width:min(760px,100%)}
+  .ci{padding:5px 9px;font-size:14px}
+  .stat b{font-size:17px}
 }
-@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+@media (max-width:620px){
+  .fnrow{grid-template-columns:100px 1fr auto auto}
+  .menu{grid-template-columns:1fr}.menu .btn.primary{grid-column:auto}
+  #overlay.side{justify-content:center}
+  #dock{max-width:100%}
+}
+@media (prefers-reduced-motion:reduce){#flash{display:none}#rotate .phone{animation:none}}
 </style>
 
 <div id="app">
@@ -155,11 +225,12 @@ body.hangar #hud,body.hangar #dock,body.hangar #marshal{display:none}
 
   <div id="hud" aria-live="off">
     <div class="cells">
-      <div class="cell primary"><div class="lbl">Airspeed</div><div><span class="v" id="hAir">0</span><span class="u">km/h</span></div></div>
-      <div class="cell"><div class="lbl">Altitude</div><div><span class="v" id="hAlt">0.0</span><span class="u">m</span></div></div>
+      <div class="cell primary"><div class="lbl">Speed</div><div><span class="v" id="hAir">0</span><span class="u">km/h</span></div></div>
+      <div class="cell"><div class="lbl">Alt</div><div><span class="v" id="hAlt">0.0</span><span class="u">m</span></div></div>
       <div class="cell small"><div class="lbl">V/S</div><div><span class="v" id="hVsi">+0.0</span><span class="u">m/s</span></div></div>
-      <div class="cell small"><div class="lbl">Heading</div><div><span class="v" id="hHdg">000</span><span class="u">°</span></div></div>
-      <div class="cell small"><div class="lbl">Load</div><div><span class="v" id="hG">1.0</span><span class="u">g</span></div></div>
+      <div class="cell small bat"><div class="lbl">Batt</div><div><span class="v" id="hBat">12.6</span><span class="u">V</span></div></div>
+      <div class="cell small hdg"><div class="lbl">Heading</div><div><span class="v" id="hHdg">000</span><span class="u">°</span></div></div>
+      <div class="cell small load"><div class="lbl">Load</div><div><span class="v" id="hG">1.0</span><span class="u">g</span></div></div>
     </div>
     <div class="inst">
       <canvas class="gauge" id="adi" width="110" height="110"></canvas>
@@ -182,95 +253,107 @@ body.hangar #hud,body.hangar #dock,body.hangar #marshal{display:none}
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
     <div id="status"><b>CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
   </div>
-
+  <div id="banner" hidden>THROTTLE CUT</div>
   <div id="marshal"></div>
 
   <div id="dock">
-    <button class="btn" id="bMode">Freefly</button>
-    <button class="btn" id="bCam">Cam: Pilot</button>
-    <button class="btn" id="bTele">Telemetry: full</button>
-    <button class="btn" id="bSound">Sound off</button>
+    <button class="btn" data-mode>Freefly</button>
+    <button class="btn" data-cam>Pilot</button>
+    <button class="btn" data-stab>Stab off</button>
+    <button class="btn" data-tele>Telemetry: full</button>
+    <button class="btn" data-sound>Sound off</button>
     <button class="btn" id="bPause">Pause</button>
     <button class="btn" id="bTx">Transmitter</button>
   </div>
+  <div id="mtop">
+    <button class="btn" data-stab>Self-level</button>
+    <button class="btn" data-cam>Pilot</button>
+    <button class="btn" id="bPauseM" aria-label="Pause">II</button>
+  </div>
+  <div id="mmid"><span>THR <b id="mThr">0%</b></span><span class="rate" id="mRate" hidden>LOW RATE</span></div>
 
   <div id="sticks">
-    <div class="stick l" id="stL"><div class="tag">Throttle · Rudder</div><div class="nub"></div></div>
+    <div class="stick l" id="stL"><div class="tag">Throttle · Rudder</div><div class="rail"><i id="thrRail"></i></div><div class="nub"></div></div>
     <div class="stick r" id="stR"><div class="tag">Elevator · Aileron</div><div class="nub"></div></div>
   </div>
 
   <div id="overlay">
     <div class="card" id="menuCard">
-      <h1>JG <span>Flight Sim</span></h1>
-      <p>CraycleCub V2 on the Kurianad strip. The flight model, the field rules and the transmitter setup are built to train for the real maiden, not to look pretty.</p>
-      <div class="kv">
-        <b>Transmitter</b><span id="txState" class="no">not detected. Plug in the sim cable, switch the TX on, move a stick.</span>
-        <b>Keyboard</b><span><kbd>←</kbd><kbd>→</kbd> ailerons · <kbd>↑</kbd> push · <kbd>↓</kbd> pull · <kbd>A</kbd><kbd>D</kbd> rudder · <kbd>W</kbd><kbd>S</kbd> throttle · <kbd>L</kbd> rates · <kbd>T</kbd> telemetry · <kbd>P</kbd> pause · <kbd>R</kbd> reset · <kbd>C</kbd> camera</span>
+      <div class="menuhead">
+        <h1>JG <span>Flight Sim</span></h1>
+        <div class="sub">CraycleCub V2 · Kurianad strip, RWY 00 · v0.5</div>
       </div>
+      <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span></div>
       <div class="menu">
-        <button class="btn primary" id="bFly">Fly</button>
-        <button class="btn" id="bHangar">Hangar</button>
-        <button class="btn" id="bMenuTx">Transmitter setup</button>
-        <button class="btn" id="bMenuSettings">Field and feel</button>
-        <button class="btn" id="bMenuLog">Logbook</button>
-        <button class="btn" id="bTouch">Touch sticks (phone)</button>
+        <button class="btn primary" id="bFly">Fly<small>Preflight checks, then the strip</small></button>
+        <button class="btn" id="bHangar">Hangar<small>The aircraft and its numbers</small></button>
+        <button class="btn" id="bMenuTx">Transmitter<small>Detect, map, test</small></button>
+        <button class="btn" id="bMenuField">Field and feel<small>Wind, rates, sound</small></button>
+        <button class="btn" id="bMenuLog">Logbook<small>Flights and landings</small></button>
       </div>
+      <p class="kbdhelp"><kbd>←</kbd><kbd>→</kbd> ailerons · <kbd>↑</kbd><kbd>↓</kbd> elevator · <kbd>A</kbd><kbd>D</kbd> rudder · <kbd>W</kbd><kbd>S</kbd> throttle · <kbd>G</kbd> stabiliser · <kbd>C</kbd> camera · <kbd>P</kbd> pause</p>
     </div>
 
     <div class="card" id="hangarCard" hidden>
       <h2>Hangar</h2>
-      <p>The aircraft the model is tuned to. Numbers in the sim come from these.</p>
+      <p>The aircraft the flight model is tuned to.</p>
       <div class="sheet" id="sheet"></div>
       <div class="row"><button class="btn primary" id="bHangarFly">Preflight and fly</button><button class="btn" id="bHangarBack">Back</button></div>
     </div>
 
     <div class="card" id="txCard" hidden>
-      <div class="row" style="justify-content:space-between"><h2>Transmitter setup</h2><button class="btn mini" id="bTxBack">Back</button></div>
-      <div><div class="lbl">Detected device</div><b id="txDevice" style="font-size:16px">No transmitter detected</b><div class="hint" id="txMeta"></div></div>
-      <div class="raw" id="txAxes"></div>
-      <div class="row" style="justify-content:space-between"><div class="lbl">Functions</div><button class="btn mini primary" id="bTxWizard">Run guided setup</button></div>
-      <div id="wiz" hidden><span class="lbl" id="wizStep"></span><b id="wizTitle"></b><span id="wizText" class="hint" style="color:var(--fg)"></span><div class="row" id="wizBtns"></div></div>
-      <div class="fntable" id="fnTable"></div>
-      <div class="hint" id="txHint">Everything here is live: the plane on the left mirrors your sticks. Assign: tap a button, then move the control you want for it. Rev flips it. The guided setup does all of this with a direction check for each stick.</div>
+      <div class="txhead"><div><h2>Transmitter</h2><div class="hint" id="txMeta"></div></div><button class="btn mini" id="bTxBack">Done</button></div>
+      <div class="txhead"><div><div class="lbl">Detected</div><b id="txDevice" style="font-size:15px">No transmitter detected</b></div><canvas id="stickMon" width="200" height="92"></canvas></div>
+      <div id="wiz" hidden><span class="lbl" id="wizStep"></span><b id="wizTitle"></b><span id="wizText"></span><div class="row" id="wizBtns"></div></div>
+      <div class="row" style="justify-content:space-between"><div class="lbl">Sticks</div><button class="btn mini primary" id="bTxWizard">Guided setup</button></div>
+      <div class="fntable" id="stickRows"></div>
+      <div class="hint" id="txHint">Guided setup finds each stick and sets its direction from the way you move it. Each mapped stick works straight away.</div>
+      <div class="lbl">Switches (optional)</div>
+      <div class="fntable" id="switchRows"></div>
+      <details><summary class="lbl">Raw channels</summary><div class="raw" id="txAxes" style="margin-top:8px"></div></details>
       <div class="lbl">Trims</div>
       <div class="trimrow" id="trims">
-        <span>Aileron</span><span class="trim"><button class="btn mini" data-trim="ail" data-d="-1">−</button><b id="trim-ail">0</b><button class="btn mini" data-trim="ail" data-d="1">+</button></span>
-        <span>Elevator</span><span class="trim"><button class="btn mini" data-trim="ele" data-d="-1">−</button><b id="trim-ele">0</b><button class="btn mini" data-trim="ele" data-d="1">+</button></span>
-        <span>Rudder</span><span class="trim"><button class="btn mini" data-trim="rud" data-d="-1">−</button><b id="trim-rud">0</b><button class="btn mini" data-trim="rud" data-d="1">+</button><button class="btn mini" id="bTrim0" style="margin-left:8px">Zero</button></span>
+        <span>AIL <span class="trim"><button class="btn mini" data-trim="ail" data-d="-1">−</button><b id="trim-ail">0</b><button class="btn mini" data-trim="ail" data-d="1">+</button></span></span>
+        <span>ELE <span class="trim"><button class="btn mini" data-trim="ele" data-d="-1">−</button><b id="trim-ele">0</b><button class="btn mini" data-trim="ele" data-d="1">+</button></span></span>
+        <span>RUD <span class="trim"><button class="btn mini" data-trim="rud" data-d="-1">−</button><b id="trim-rud">0</b><button class="btn mini" data-trim="rud" data-d="1">+</button></span></span>
       </div>
+      <div class="row"><button class="btn mini" id="bTrim0">Zero trims</button></div>
     </div>
 
     <div class="card" id="preCard" hidden>
       <h2>Preflight</h2>
-      <p>Same checks as at the field. Items tick themselves as you do them. Watch the plane: every surface should move the way the real one would.</p>
+      <p>Items tick themselves as you do them. Watch the aircraft while you move each control.</p>
       <div class="check">
-        <div class="ci" id="pf-tx"><span class="dot"></span><span>Transmitter mapped and verified</span><small id="pf-tx-v">keyboard</small></div>
-        <div class="ci" id="pf-thr"><span class="dot"></span><span>Throttle stick fully down</span><small id="pf-thr-v">100%</small></div>
-        <div class="ci done" id="pf-batt"><span class="dot"></span><span>Battery: 3S 2200 mAh</span><small>12.6 V</small></div>
-        <div class="ci" id="pf-ail"><span class="dot"></span><span>Aileron: full right</span><small>right aileron up, left down</small></div>
-        <div class="ci" id="pf-ele"><span class="dot"></span><span>Elevator: full pull</span><small>elevator trailing edge up</small></div>
-        <div class="ci" id="pf-rud"><span class="dot"></span><span>Rudder: full right</span><small>rudder swings right</small></div>
-        <div class="ci" id="pf-wind" style="cursor:pointer"><span class="dot"></span><span>Wind and runway (tap to confirm)</span><small id="pf-wind-v">330° at 2 m/s, RWY 00</small></div>
+        <div class="ci" id="pf-tx"><span class="dot"></span><span>Controls</span><small id="pf-tx-v">keyboard</small></div>
+        <div class="ci" id="pf-thr"><span class="dot"></span><span>Throttle fully down</span><small id="pf-thr-v">0%</small></div>
+        <div class="ci" id="pf-cut" hidden><span class="dot"></span><span>Throttle cut off</span><small id="pf-cut-v">off</small></div>
+        <div class="ci done"><span class="dot"></span><span>Battery 3S 2200 mAh</span><small>12.6 V</small></div>
+        <div class="ci" id="pf-ail"><span class="dot"></span><span>Aileron full right</span><small>right aileron up</small></div>
+        <div class="ci" id="pf-ele"><span class="dot"></span><span>Elevator full pull</span><small>elevator up</small></div>
+        <div class="ci" id="pf-rud"><span class="dot"></span><span>Rudder full right</span><small>rudder right</small></div>
+        <div class="ci" id="pf-wind" style="cursor:pointer"><span class="dot"></span><span>Wind and runway, tap</span><small id="pf-wind-v">330° at 2 m/s</small></div>
       </div>
+      <div class="hint" id="pfWhy"></div>
       <div class="row">
         <button class="btn primary" id="bClear">Clear prop. Fly</button>
         <button class="btn" id="bSkipPre">Skip</button>
         <button class="btn" id="bPreTx">Transmitter</button>
+        <button class="btn" id="bPreBack">Back</button>
       </div>
     </div>
 
     <div class="card" id="crashCard" hidden>
-      <h1 class="bad-t" id="crashTitle">Crashed</h1>
+      <h1 class="bad-t">Crashed</h1>
       <p id="crashWhy"></p>
-      <div class="stat"><div><span class="lbl">Flight</span><b id="crashTime">0:00</b></div><div><span class="lbl">Top speed</span><b id="crashSpd">0</b> <span class="lbl">km/h</span></div><div><span class="lbl">Max alt</span><b id="crashAlt">0</b> <span class="lbl">m</span></div></div>
-      <div class="row"><button class="btn primary" id="bAgain">Back on the strip</button></div>
+      <div class="stat"><div><span class="lbl">Airtime</span><b id="crashTime">0:00</b></div><div><span class="lbl">Top speed</span><b id="crashSpd">0</b> <span class="lbl">km/h</span></div><div><span class="lbl">Max alt</span><b id="crashAlt">0</b> <span class="lbl">m</span></div></div>
+      <div class="row"><button class="btn primary" id="bAgain">Back on the strip</button><button class="btn" id="bCrashMenu">Menu</button></div>
     </div>
 
     <div class="card" id="landCard" hidden>
       <h1>Flight <span>logged</span></h1>
       <p id="landWhy">Landed.</p>
       <div class="stat"><div><span class="lbl">Airtime</span><b id="landTime">0:00</b></div><div><span class="lbl">Touchdown</span><b id="landSink">0.0</b> <span class="lbl">m/s</span></div><div><span class="lbl">Violations</span><b id="landViol">0</b></div></div>
-      <div class="row"><button class="btn primary" id="bLandAgain">Taxi back and go again</button><button class="btn" id="bLandLog">Logbook</button></div>
+      <div class="row"><button class="btn primary" id="bLandAgain">Go again</button><button class="btn" id="bLandLog">Logbook</button><button class="btn" id="bLandMenu">Menu</button></div>
     </div>
 
     <div class="card" id="winCard" hidden>
@@ -282,40 +365,53 @@ body.hangar #hud,body.hangar #dock,body.hangar #marshal{display:none}
 
     <div class="card" id="pauseCard" hidden>
       <h2>Paused</h2>
-      <p>Sim is frozen. The battery clock stops too.</p>
-      <div class="row"><button class="btn primary" id="bResume">Resume</button><button class="btn" id="bPauseTx">Transmitter</button><button class="btn" id="bPauseLog">Logbook</button><button class="btn" id="bPauseReset">Reset</button><button class="btn" id="bPauseMenu">Main menu</button></div>
+      <div class="menu">
+        <button class="btn primary" id="bResume">Resume</button>
+        <button class="btn" data-mode>Freefly</button>
+        <button class="btn" data-stab>Stab off</button>
+        <button class="btn" data-tele>Telemetry: full</button>
+        <button class="btn" data-sound>Sound off</button>
+        <button class="btn" id="bPauseField">Field and feel</button>
+        <button class="btn" id="bPauseTx">Transmitter</button>
+        <button class="btn" id="bPauseLog">Logbook</button>
+        <button class="btn" id="bPauseReset">Reset</button>
+        <button class="btn" id="bPauseMenu">Main menu</button>
+      </div>
     </div>
 
     <div class="card" id="logCard" hidden>
       <h2>Logbook</h2>
       <div class="stat" id="logStats"></div>
-      <p id="logNote">Saved in this browser. Flights count once you land or crash.</p>
+      <p>Saved in this browser. Flights count once you land or crash.</p>
       <div class="row"><button class="btn primary" id="bLogClose">Close</button><button class="btn" id="bLogClear">Clear logbook</button></div>
+    </div>
+
+    <div class="card" id="fieldCard" hidden>
+      <div class="row" style="justify-content:space-between"><h2>Field and feel</h2><button class="btn mini" id="bFieldBack">Done</button></div>
+      <div class="sec">
+        <div class="lbl">Feel</div>
+        <div class="sl"><label for="sRates">Rates</label><input type="range" id="sRates" min="40" max="140" value="100"><output id="oRates">100%</output></div>
+        <div class="sl"><label for="sExpo">Expo</label><input type="range" id="sExpo" min="0" max="80" value="30"><output id="oExpo">30%</output></div>
+        <div class="sl"><label for="sLow">Low rate</label><input type="range" id="sLow" min="40" max="90" value="65"><output id="oLow">65%</output></div>
+        <div class="hint">Stabiliser: Off is the raw aircraft. Assist damps the rates like a gyro. Self-level holds the attitude the stick asks for, up to 45° of bank, and levels when you let go.</div>
+      </div>
+      <div class="sec">
+        <div class="lbl">Field</div>
+        <div class="sl"><label for="sWind">Wind</label><input type="range" id="sWind" min="0" max="8" step="0.5" value="2"><output id="oWind">2 m/s</output></div>
+        <div class="sl"><label for="sWdir">From</label><input type="range" id="sWdir" min="0" max="359" step="5" value="330"><output id="oWdir">330°</output></div>
+        <div class="sl"><label for="sGust">Gusts</label><input type="range" id="sGust" min="0" max="100" value="35"><output id="oGust">35%</output></div>
+      </div>
+      <div class="sec">
+        <div class="lbl">Sound and display</div>
+        <div class="sl"><label for="sVol">Volume</label><input type="range" id="sVol" min="0" max="100" value="70"><output id="oVol">70%</output></div>
+        <label class="toggle"><input type="checkbox" id="cSticks"> Touch sticks</label>
+        <label class="toggle"><input type="checkbox" id="cHaptics" checked> Vibration on touchdown and crash</label>
+        <label class="toggle"><input type="checkbox" id="cShadow" checked> Shadows</label>
+      </div>
     </div>
   </div>
 
-  <div id="drawer" hidden>
-    <div class="row" style="justify-content:space-between"><h2>Field and feel</h2><button class="btn mini" id="bClose">Close</button></div>
-    <div class="sec">
-      <div class="lbl">Feel</div>
-      <div class="sl"><span>Rates</span><input type="range" id="sRates" min="40" max="140" value="100"><output id="oRates">100%</output></div>
-      <div class="sl"><span>Expo</span><input type="range" id="sExpo" min="0" max="80" value="30"><output id="oExpo">30%</output></div>
-      <div class="sl"><span>Low rate</span><input type="range" id="sLow" min="40" max="90" value="65"><output id="oLow">65%</output></div>
-      <div class="hint">Map a switch to Dual rates in Transmitter setup, or press <kbd>L</kbd>. Trims live in Transmitter setup.</div>
-    </div>
-    <div class="sec">
-      <div class="lbl">Field</div>
-      <div class="sl"><span>Wind</span><input type="range" id="sWind" min="0" max="8" step="0.5" value="2"><output id="oWind">2 m/s</output></div>
-      <div class="sl"><span>From</span><input type="range" id="sWdir" min="0" max="359" step="5" value="330"><output id="oWdir">330°</output></div>
-      <div class="sl"><span>Gusts</span><input type="range" id="sGust" min="0" max="100" value="35"><output id="oGust">35%</output></div>
-    </div>
-    <div class="sec">
-      <div class="lbl">Sound and display</div>
-      <div class="sl"><span>Volume</span><input type="range" id="sVol" min="0" max="100" value="70"><output id="oVol">70%</output></div>
-      <label class="toggle"><input type="checkbox" id="cSticks"> Show touch sticks</label>
-      <label class="toggle"><input type="checkbox" id="cShadow" checked> Shadows</label>
-    </div>
-  </div>
+  <div id="rotate"><div class="phone"></div><b style="font-size:22px">Turn your phone sideways</b><span class="hint">The sim flies in landscape, sticks in both corners.</span><button class="btn" id="bRotateAnyway">Continue in portrait</button></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -328,10 +424,12 @@ const $=id=>document.getElementById(id);
 const clamp=Sim.clamp, AC=Sim.AC;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const SAVE_V=3;
+const MOBILE=matchMedia('(pointer:coarse)').matches&&Math.min(screen.width,screen.height)<820;
+if(MOBILE)document.body.classList.add('mobile');
+const SAVE_V=5;
 const store={get(k,d){try{const raw=localStorage.getItem(k);if(!raw)return d;const v=JSON.parse(raw);if(v&&typeof v==='object'&&!Array.isArray(v)){if(v.__v!==undefined&&v.__v>SAVE_V)return d;delete v.__v;}return v;}catch(e){return d}},set(k,v){try{if(v&&typeof v==='object'&&!Array.isArray(v))v={...v,__v:SAVE_V};localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
 const num=(v,d,a,b)=>typeof v==='number'&&isFinite(v)?clamp(v,a,b):d;
-const settings=Object.assign({rates:100,expo:30,low:65,vol:70,wind:2,wdir:330,gust:35,sticks:false,shadow:true,tele:'full'},store.get('jgsim.settings',{}));
+const settings=Object.assign({rates:100,expo:30,low:65,vol:70,wind:2,wdir:330,gust:35,sticks:false,shadow:!MOBILE,tele:MOBILE?'minimal':'full',haptics:true},store.get('jgsim.settings',{}));
 ['rates','expo','low','vol','wind','wdir','gust'].forEach(k=>{const d={rates:100,expo:30,low:65,vol:70,wind:2,wdir:330,gust:35}[k];settings[k]=num(settings[k],d,0,400);});
 const trims=Object.assign({ail:0,ele:0,rud:0},store.get('jgsim.trims',{}));
 ['ail','ele','rud'].forEach(k=>trims[k]=num(trims[k],0,-0.3,0.3));
@@ -340,7 +438,7 @@ const logbook=Object.assign({flights:0,airtime:0,landings:0,firm:0,hard:0,crashe
 if(logbook.bestGate!==null&&typeof logbook.bestGate!=='number')logbook.bestGate=null;
 
 let st=Sim.create();
-const G={mode:'free',cam:'pilot',view:'fly',sound:false,started:false,flying:false,crashed:false,landed:false,paused:false,lowRate:false,cut:false,flapPos:0,gearUp:false,viol:0,lastGroundT:0,flightStart:0,preflight:{ail:false,ele:false,rud:false,wind:false},trauma:0,frameMs:16,fps:60};
+const G={mode:'free',cam:'pilot',view:'fly',sound:false,started:false,flying:false,crashed:false,landed:false,paused:false,lowRate:false,kRates:false,cut:false,stab:0,kStab:0,flapPos:0,gearUp:false,viol:0,lastGroundT:0,flightStart:0,preflight:{ail:false,ele:false,rud:false,wind:false},trauma:0,frameMs:16,fps:60};
 const IN={ail:0,ele:0,rud:0,thr:0,flap:0,src:'keyboard',rawAil:0,rawEle:0,rawRud:0,rawThr:0};
 
 /*__SCENE__*/
@@ -360,12 +458,12 @@ function frame(now){
   requestAnimationFrame(frame);
   resize();
   const dt=clamp((now-last)/1000,0,0.05);last=now;
-  if(!isFinite(st.pos.x)){say('Sim state reset after a numeric fault.','warn');reset();}
+  if(!isFinite(st.pos.x)){reset();say('Sim state reset after a numeric fault.','warn');}
   readInput();
   const has=!!pad;if(padShown!==has){padShown=has;showPad();}
   updatePreflight();updateTx();
-  adaptResolution(dt);updateParticles(dt);updateTweens(dt);
-  const live=G.started&&!G.crashed&&!G.landed&&!G.paused&&$('overlay').hidden;
+  adaptResolution(dt);updateParticles(dt);updateTweens(dt);updateClouds(dt);
+  const live=G.flying&&!G.crashed&&!G.landed&&!G.paused&&$('overlay').hidden;
   if(live){
     updateWind(dt);
     acc+=dt;let n=0,crash=null;
@@ -381,21 +479,22 @@ function frame(now){
       marshal();
       if(G.mode==='gates')checkGate();
       if(st.airborne&&st.onGround){if(st.V<0.8){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
-        if(st.touchdown&&!st.touchdown.said){st.touchdown.said=true;feedback(st.touchdown.sink>1.8?'medium':'small',st.pos.x,0.05,st.pos.z);thud(clamp(st.touchdown.sink/2.6,0.15,0.8));say('Down. Sink '+st.touchdown.sink.toFixed(1)+' m/s at '+(st.touchdown.speed*3.6).toFixed(0)+' km/h.',st.touchdown.sink>1.8?'warn':'good');}}
+        if(st.touchdown&&!st.touchdown.said){st.touchdown.said=true;haptic(st.touchdown.sink>1.8?80:30);feedback(st.touchdown.sink>1.8?'medium':'small',st.pos.x,0.05,st.pos.z);thud(clamp(st.touchdown.sink/2.6,0.15,0.8));say('Down. Sink '+st.touchdown.sink.toFixed(1)+' m/s at '+(st.touchdown.speed*3.6).toFixed(0)+' km/h.',st.touchdown.sink>1.8?'warn':'good');}}
       if(st.onGround&&st.surf==='grass'&&st.V>4&&Math.random()<dt*8)burst(st.pos.x,0.05,st.pos.z,2,0.6,0.6);
     }
   }
   plane.position.copy(st.pos);plane.quaternion.copy(st.q);
-  if(G.view==='hangar'&&!G.started){st.propAngle+=IN.thr*40*dt;}
-  propBlade.rotation.z=st.propAngle;prop.material.opacity=clamp((live?st.thr:IN.thr)*0.5,0,0.4);
+  const spin=live?st.thr:IN.thr*0.6;st.propAngle+=(live?0:spin*60*dt);
+  propHub.rotation.z=st.propAngle;propDisc.material.opacity=clamp(spin*0.55,0,0.42);propHub.children.forEach(b=>b.visible=spin<0.35);
   animateSurfaces(IN);
-  sockArm.rotation.y=-settings.wdir*Math.PI/180+Math.PI/2+Math.PI;cone.rotation.x=0;sockArm.rotation.z=-clamp(0.9-settings.wind*0.14,0,0.9);
+  $('thrRail').style.height=Math.round(IN.rawThr*100)+'%';
+  sockArm.rotation.y=-settings.wdir*Math.PI/180+Math.PI/2+Math.PI;sockArm.rotation.z=-clamp(0.9-settings.wind*0.14,0,0.9);
   sun.target.position.copy(st.pos);sun.position.copy(st.pos).add(new THREE.Vector3(-60,90,-40));
-  updateCamera(dt);updateHUD(dt);updateAudio(dt);
+  updateCamera(dt);updateMarker();updateHUD(dt);updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
-reset();show('menuCard');showPad();
+window.JG={plane,THREE,surf,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+showPad();show('menuCard');
 requestAnimationFrame(frame);
 })();
 </script>

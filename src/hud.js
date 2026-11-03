@@ -35,6 +35,11 @@ function updateHUD(dt){
   $('hWind').textContent=settings.wdir+'° '+settings.wind+' m/s';
   $('sInput').textContent=IN.src;$('sRate').textContent=G.lowRate?'low rate':'high rate';$('sFps').textContent=Math.round(1000/Math.max(G.frameMs,1))+' fps'+(pixelRatio<1?' ·'+pixelRatio+'x':'');
   if(G.mode==='gates'){$('gNum').textContent=Math.min(gate.i+1,gateObjs.length);$('gTot').textContent=gateObjs.length;$('gTime').textContent=(gate.running?(st.time-gate.t0):0).toFixed(2)+'s';$('gBest').textContent=logbook.bestGate!==null?'best '+logbook.bestGate.toFixed(2)+'s':'';}
-  if((hudTick++&1)===0){drawADI(a);drawMap(a);}
+  $('hBat').textContent=st.volt.toFixed(1);$('hBat').className='v'+(st.volt<AC.cells*AC.alarmV?' bad':st.volt<11.1?' warn':'');
+  $('banner').hidden=!(G.cut&&G.flying);
+  if(G.stab!==lastStab){lastStab=G.stab;applyStabLabel();}
+  $('mThr').textContent=G.cut?'CUT':Math.round(IN.thr*100)+'%';$('mRate').hidden=!G.lowRate;
+  if((hudTick++&1)===0){drawADI(a);if(!MOBILE||settings.tele==='full')drawMap(a);}
 }
+let lastStab=-1;
 

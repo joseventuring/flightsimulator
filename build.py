@@ -19,6 +19,7 @@ head, rest = page.split('<style>', 1)
 style, body = rest.split('</style>', 1)
 index = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
          '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
+         '<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#1B222B">\n<meta name="mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n<link rel="apple-touch-icon" href="icon-512.png">\n'
          + head + '<style>' + style + '</style>\n</head>\n<body>' + body + '\n</body>\n</html>\n')
 (root / 'index.html').write_text(index)
 print('built app.html', len(app), 'bytes; index.html', len(index), 'bytes')

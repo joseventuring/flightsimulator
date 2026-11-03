@@ -1,0 +1,12 @@
+{
+  "name": "JG Flight Sim",
+  "short_name": "JG Sim",
+  "description": "Jinu's Garage RC flight simulator: CraycleCub V2 on the Kurianad strip.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1B222B",
+  "theme_color": "#1B222B",
+  "icons": [{"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]
+}

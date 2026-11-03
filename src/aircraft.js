@@ -51,6 +51,14 @@ const AIRCRAFT={
       Ipitch:0.06,Iroll:0.04,Iyaw:0.09,cells:6,capAh:3.3,Imax:65,KV:1950,blades:12,features:{flaps:true,gear:true},
       wheels:[{p:V(-0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0,-0.145,-0.30),r:0.025,steer:-0.25}]},
     tail:[0.40,0.035],paint:{primary:'#F2EFE8',secondary:'#1B222B',accent:'#1F4E79'}},
+  sprint:{id:'sprint',name:'Sprint Q-16',role:'FPV quad',kind:'quad',price:3500,blurb:'5 inch freestyle quad, 650 g on 6S, eight times more thrust than weight. Acro by default like a real FPV quad: the sticks set rotation rates and nothing levels it for you. Horizon and Angle are on the stabiliser button.',
+    geom:{quad:true,k:1,arm:0.0795,propR:0.0635},
+    phys:{name:'Sprint Q-16',kind:'quad',mass:0.65,span:0.225,arm:0.0795,Tmax:54,thrExp:1.6,Vpitch:48,motorTau:0.03,kQ:0.016,kH:0.006,CdA:[0.010,0.020,0.008],
+      Ipitch:0.0016,Iroll:0.0013,Iyaw:0.0026,rateC:200,rateMax:720,yawMax:450,maxAngle:55,kAngle:7,kP:60,kPy:30,kI:15,kD:1.2,
+      cells:6,capAh:1.1,Imax:120,Iidle:0.6,rCell:0.005,KV:1750,blades:3,propD:0.127,kWheel:2500,cWheel:20,alarmV:3.5,spawnY:0.022,
+      contacts:[{x:-0.0795,y:-0.02,z:-0.0795},{x:0.0795,y:-0.02,z:-0.0795},{x:-0.0795,y:-0.02,z:0.0795},{x:0.0795,y:-0.02,z:0.0795},{x:0,y:0.075,z:0},{x:0,y:0.0,z:-0.075},{x:0,y:0.0,z:0.08},
+        {x:-0.0795,y:0.03,z:-0.0795},{x:0.0795,y:0.03,z:-0.0795},{x:-0.0795,y:0.03,z:0.0795},{x:0.0795,y:0.03,z:0.0795}],features:{flaps:false,gear:false}},
+    paint:{primary:'#E8503A',secondary:'#1B222B',accent:'#F5C542'}},
 };
 /* gear springs scale with weight so every aircraft sits and rebounds like the 620 g Cub they were tuned on */
 ['arrow','vortex','comet'].forEach(id=>{const A=AIRCRAFT[id],m=A.phys.mass/0.62;Object.assign(A.phys,tailFrom(A.geom,A.phys,A.tail[0],A.tail[1]),{crashPts:crashFrom(A.geom,A.geom.propR),kWheel:600*m,cWheel:12*Math.sqrt(m)});});
@@ -70,7 +78,8 @@ function upOf(id){return Object.assign({motor:0,battery:0,prop:0},career.up[id]|
 function paintOf(id){return Object.assign({},AIRCRAFT[id].paint,career.paint[id]||{});}
 /* apply an aircraft and its upgrades to the live flight model */
 const toV=o=>new THREE.Vector3(o.x,o.y,o.z);
-function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wheels','crashPts','wingPos','tailPos','finPos','features'];
+function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wheels','crashPts','wingPos','tailPos','finPos','features','contacts'];
+  for(const k in AC){if(!(k in AC_BASE))delete AC[k];} // a quad's fields must not leak into the next plane
   for(const k in AC_BASE){if(vec.includes(k))continue;AC[k]=AC_BASE[k];}
   ['wingPos','tailPos','finPos'].forEach(k=>AC[k]=toV(A.phys[k]||AC_BASE[k]));
   AC.wheels=(A.phys.wheels||AC_BASE.wheels).map(w=>({p:w.p.clone(),r:w.r,steer:w.steer}));
@@ -80,6 +89,7 @@ function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wh
   const sc=A.phys.span/0.8;
   AC.crashPts=A.phys.crashPts?A.phys.crashPts.map(([n,p])=>[n,toV(p)]):AC_BASE.crashPts.map(([n,p])=>[n,new THREE.Vector3(p.x*sc,p.y,p.z*A.geom.k)]);
   AC.features=Object.assign({flaps:false,gear:false},A.phys.features||{});
+  if(AC.kind==='quad'){AC.contacts=A.phys.contacts.map(toV);AC.wheels=[];AC.crashPts=[];AC.spawnPitch=0;AC.spawnY=A.phys.spawnY;return;}
   /* resting attitude: the angle that puts the main wheels and the third wheel on the ground together */
   const W=AC.wheels,ym=W[0].p.y-W[0].r,yt=W[2].p.y-W[2].r,th=Math.atan((ym-yt)/(W[0].p.z-W[2].p.z));
   AC.spawnPitch=th;AC.spawnY=-(ym*Math.cos(th)-W[0].p.z*Math.sin(th))+0.002;}
@@ -87,6 +97,16 @@ function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wh
 /* the pack a battery upgrade gives this aircraft, e.g. 4S 3000 */
 function packName(id,i){const P=Object.assign({},AC_BASE,AIRCRAFT[id].phys);return P.cells+'S '+Math.round(P.capAh*UPGRADES.battery[i].cap*10)*100;}
 function statsOf(id){const A=AIRCRAFT[id],u=upOf(id);const P=Object.assign({},AC_BASE,A.phys);const m=UPGRADES.motor[u.motor],b=UPGRADES.battery[u.battery],p=UPGRADES.prop[u.prop];
+  if(P.kind==='quad'){/* top speed: full power, tilted until thrust only just holds height; rotor and body drag balance what is left */
+    const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass*(1+b.dm),W=mass*9.81;let vmax=0;
+    /* same terms as the sim: inflow through the tilted disc, sag at full current, body drag on both axes, rotor drag.
+       For each speed find the tilt that holds height, then check there is still forward force left. */
+    const sag=Math.pow((4.1-P.Imax*m.I*P.rCell)/4.2,2),r=0.5*1.18;
+    const net=(v,th)=>{const vy=v*Math.sin(th),vz=v*Math.cos(th),Te=T*sag*Math.max(0,1-vy/Vp);const Fy=Te-r*P.CdA[1]*v*vy,Ff=-(P.kH*Te*vz+r*P.CdA[2]*v*vz);
+      return [Fy*Math.cos(th)-Ff*Math.sin(th)-W,Fy*Math.sin(th)+Ff*Math.cos(th)];};
+    for(let v=1;v<90;v+=0.5){let ok=false;for(let th=0.02;th<1.55;th+=0.01){const [up,fw]=net(v,th);if(up<0)break;if(fw>0)ok=true;}if(!ok)break;vmax=v;}
+    const hov=Math.pow(W/T,1/P.thrExp),Ih=P.Iidle+P.Imax*m.I*Math.pow(W/T,1.5);
+    return {quad:true,vmax:vmax*3.6,vs:hov*100,climb:T/W,roll:P.rateMax,endur:P.capAh*b.cap*0.72/Ih*60};}
   const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass*(1+b.dm),CL=P.CL0+P.CLa*P.aStall;
   const vs=Math.sqrt(2*mass*9.81/(1.18*P.S*CL))*3.6;
   let v=10;for(let i=0;i<80;i++){const thrust=T*Math.max(0,Sim.thrustFactor({edf:P.edf,Vpitch:Vp},v));const D=0.5*1.18*v*v*P.S*(P.CD0+0.015);v+=(thrust-D)*0.4;v=Math.max(5,v);}

@@ -28,13 +28,14 @@ function thrustFactor(P,u){if(P.edf){const x=Math.max(u,0)/P.Vpitch,s=Math.sqrt(
 function create(){
   return {pos:new V3(0,AC.spawnY||0.11,0),gearPos:0,vel:new V3(),q:new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),AC.spawnPitch===undefined?0.15:AC.spawnPitch),w:new V3(),
     thr:0,T:0,time:0,usedAh:0,volt:AC.cells*4.2,amp:0,soc:1,onGround:true,airborne:false,alpha:0,beta:0,V:0,nz:1,stall:0,
-    touchdown:null,maxV:0,maxAlt:0,wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
+    touchdown:null,maxV:0,maxAlt:0,mT:[0,0,0,0],iw:new V3(),air:false,turtleT:0,motor:[0,0,0,0],wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
 }
 // scratch
 const _qi=new THREE.Quaternion(),_va=new V3(),_vb=new V3(),_F=new V3(),_tq=new V3(),_pw=new V3(),_ww=new V3(),_rw=new V3(),_vw=new V3(),
       _axle=new V3(),_roll=new V3(),_Fw=new V3(),_Fb=new V3(),_rxF=new V3(),_up=new V3(0,1,0),_dq=new THREE.Quaternion(),_ax=new V3(),_Iw=new V3(),_gy=new V3();
 /* inp: {ail,ele,rud:-1..1, thr:0..1}; env: {wind:V3 world, rho, surfaceAt(x,z)->'strip'|'grass'} ; returns crash reason or null */
 function step(st,inp,dt,env){
+  if(AC.kind==='quad')return stepQuad(st,inp,dt,env);
   st.time+=dt;
   const rho=env.rho||1.18;
   _qi.copy(st.q).invert();
@@ -158,7 +159,83 @@ function step(st,inp,dt,env){
   st.propAngle+=(st.thr*AC.KV*AC.cells*4.2/60*6.28*0.02+V*2)*dt;
   return crash;
 }
-return {AC,create,step,ocv,clamp,thrustFactor};
+
+/* ---------- multirotor: four motors, a Betaflight-style flight controller, rotor and body drag ----------
+   Body frame (three.js): x right, y up (thrust), z aft. Motors in an X: FL, FR, RL, RR. Props-in rotation:
+   FL and RR clockwise, FR and RL counter-clockwise seen from above; a prop's drag torque yaws the frame the other way.
+   Flight modes: 0 Acro (sticks command rotation rates), 1 Horizon (self-levels near centre stick, acro at full stick),
+   2 Angle (sticks command a tilt angle, the craft levels itself). Airmode keeps full authority at zero throttle once armed. */
+const _mq=[new V3(),new V3(),new V3(),new V3()],_u=new V3(),_d=new V3(),_f=new V3(),_r=new V3(),_e=new V3(),_wd=new V3(),_cp=new V3(),_cv=new V3(),_fb=new V3();
+const MOT=[[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]]; // [x sign, z sign, spin: +1 counter-clockwise from above]
+function rateCurve(s,max){const a=Math.abs(s);return Math.sign(s)*(AC.rateC*a+(max-AC.rateC)*a*a*a)*Math.PI/180;}
+function stepQuad(st,inp,dt,env){
+  st.time+=dt;const rho=env.rho||1.18,a=AC.arm,Tm=AC.Tmax/4,J=[AC.Ipitch,AC.Iyaw,AC.Iroll];
+  _qi.copy(st.q).invert();_va.copy(st.vel).sub(env.wind);const V=_va.length();_vb.copy(_va).applyQuaternion(_qi);
+  const battF=Math.pow(st.volt/(AC.cells*4.2),2);const armed=inp.arm!==false;const thr=armed?clamp(inp.thr,0,1):0;
+  if(thr>0.25)st.air=true;
+  /* stick to rate command */
+  const mode=inp.mode|0;
+  const acroX=rateCurve(inp.ele,AC.rateMax),acroZ=-rateCurve(inp.ail,AC.rateMax),wy=-rateCurve(inp.rud,AC.yawMax);
+  let wx=acroX,wz=acroZ;
+  if(mode>0){ // angle loop: tilt the body up-vector toward the one the sticks ask for
+    _u.set(0,1,0).applyQuaternion(st.q);_f.set(0,0,-1).applyQuaternion(st.q);_f.y=0;if(_f.lengthSq()<1e-4)_f.set(0,0,-1).applyQuaternion(st.q).setY(0).add(_u.clone().setY(0).multiplyScalar(-1));_f.normalize();
+    _r.set(-_f.z,0,_f.x);const mA=AC.maxAngle*Math.PI/180;
+    _d.set(0,1,0).addScaledVector(_r,Math.tan(inp.ail*mA)).addScaledVector(_f,-Math.tan(inp.ele*mA)).normalize();
+    _e.copy(_u).cross(_d);const sn=_e.length(),cs=_u.dot(_d);const ang=Math.atan2(sn,cs);if(sn>1e-6)_e.multiplyScalar(ang/sn);else if(cs<0)_e.set(0,0,Math.PI);
+    _e.applyQuaternion(_qi);const ax=clamp(AC.kAngle*_e.x,-AC.rateMax*0.0175,AC.rateMax*0.0175),az=clamp(AC.kAngle*_e.z,-AC.rateMax*0.0175,AC.rateMax*0.0175);
+    if(mode===2){wx=ax;wz=az;}else{const k=Math.min(1,Math.max(Math.abs(inp.ail),Math.abs(inp.ele)));const h=k*k;wx=ax*(1-h)+acroX*h;wz=az*(1-h)+acroZ*h;}
+  }
+  _wd.set(wx,wy,wz);
+  /* rate PID to torque */
+  const on=armed&&(thr>0.02||st.air);
+  const ex=_wd.x-st.w.x,ey=_wd.y-st.w.y,ez=_wd.z-st.w.z;
+  if(on&&!st.onGround){st.iw.x=clamp(st.iw.x+ex*dt,-0.5,0.5);st.iw.y=clamp(st.iw.y+ey*dt,-0.5,0.5);st.iw.z=clamp(st.iw.z+ez*dt,-0.5,0.5);}else st.iw.multiplyScalar(0.9);
+  /* D on the gyro (not the error), as Betaflight does: damps the motor-lag overshoot without kicking on stick moves */
+  const kD=AC.kD||0;if(!st.pw)st.pw=st.w.clone();const dx=(st.w.x-st.pw.x)/dt,dy=(st.w.y-st.pw.y)/dt,dz=(st.w.z-st.pw.z)/dt;st.pw.copy(st.w);
+  const tx=J[0]*(AC.kP*ex+AC.kI*st.iw.x-kD*dx),ty=J[1]*(AC.kPy*ey+AC.kI*st.iw.y-kD*0.5*dy),tz=J[2]*(AC.kP*ez+AC.kI*st.iw.z-kD*dz);
+  /* mixer with airmode: thrust per motor = collective + attitude terms, shifted (never clipped) to stay inside idle..full */
+  const Tb=Tm*Math.pow(thr,AC.thrExp),Tidle=on?Tm*0.03:0;const c=[0,0,0,0];
+  for(let i=0;i<4;i++){const [sx,sz,dir]=MOT[i];c[i]=(on?Tb:0)+(on?(tx*(-sz*a)/(4*a*a)+tz*(sx*a)/(4*a*a)+ty*(-dir)/(4*AC.kQ)):0);}
+  if(on){let lo=Math.min(...c),hi=Math.max(...c);const span=hi-lo,room=Tm-Tidle;
+    if(span>room){const mid=(hi+lo)/2,k=room/span;for(let i=0;i<4;i++)c[i]=mid+(c[i]-mid)*k;lo=Math.min(...c);hi=Math.max(...c);}
+    const lim=st.air?Tidle:0;if(lo<lim){const sh=lim-lo;for(let i=0;i<4;i++)c[i]+=sh;}hi=Math.max(...c);if(hi>Tm){const sh=hi-Tm;for(let i=0;i<4;i++)c[i]-=sh;}
+    for(let i=0;i<4;i++)c[i]=clamp(c[i],0,Tm);}
+  /* motors: first-order spin-up, thrust falls with inflow through the disc, a little ground effect */
+  const inflow=clamp(1-_vb.y/AC.Vpitch,0,1.15),ge=1+0.12*Math.exp(-Math.max(st.pos.y,0)/0.25);let Tsum=0,Lx=0,Ly=0,Lz=0,mot=0;
+  for(let i=0;i<4;i++){st.mT[i]+=(c[i]-st.mT[i])*(1-Math.exp(-dt/AC.motorTau));const T=st.mT[i]*battF*inflow*ge;const [sx,sz,dir]=MOT[i];
+    Tsum+=T;Lx+=-sz*a*T;Lz+=sx*a*T;Ly+=-dir*AC.kQ*T;st.motor[i]=Math.sqrt(st.mT[i]/Tm);mot+=st.motor[i]/4;}
+  st.T=Tsum;st.thr=mot;
+  /* forces in body axes: thrust, rotor drag (H-force, grows with thrust), body drag per axis */
+  const sp=Math.hypot(_vb.x,_vb.z);
+  _fb.set(-AC.kH*Tsum*_vb.x-0.5*rho*AC.CdA[0]*V*_vb.x, Tsum-0.5*rho*AC.CdA[1]*V*_vb.y, -AC.kH*Tsum*_vb.z-0.5*rho*AC.CdA[2]*V*_vb.z);
+  _F.copy(_fb).applyQuaternion(st.q);_F.y-=AC.mass*AC.g;
+  _tq.set(Lx-0.0006*st.w.x,Ly-0.0006*st.w.y,Lz-0.0006*st.w.z);
+  /* battery: current follows motor power, roughly thrust^1.5 */
+  let pw=0;for(let i=0;i<4;i++)pw+=Math.pow(st.mT[i]/Tm,1.5)/4;
+  st.amp=(on?AC.Iidle:0)+AC.Imax*pw;st.usedAh+=st.amp*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);
+  /* ground: frame contact points, spring-damper with friction; hard hits and turtling end the flight */
+  let contact=false,hit=0,hitH=0,crash=null;
+  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=-_pw.y;if(pen<=0)continue;
+    _ww.copy(st.w).applyQuaternion(st.q);_rw.copy(p).applyQuaternion(st.q);_cv.copy(_ww).cross(_rw).add(st.vel);
+    let N=AC.kWheel*pen-AC.cWheel*_cv.y;if(N<0)N=0;const vt=Math.hypot(_cv.x,_cv.z);
+    _Fw.set(0,N,0);if(vt>1e-4){const f=Math.min(0.6*N,AC.mass*vt/dt*0.25);_Fw.x-=f*_cv.x/vt;_Fw.z-=f*_cv.z/vt;}
+    _F.add(_Fw);_Fb.copy(_Fw).applyQuaternion(_qi);_tq.add(_rxF.copy(p).cross(_Fb));contact=true;if(-_cv.y>hit)hit=-_cv.y;if(vt>hitH)hitH=vt;}
+  _u.set(0,1,0).applyQuaternion(st.q);
+  if(contact&&!st.onGround&&st.airborne){st.touchdown={sink:hit,speed:V,t:st.time};
+    if(hit>4.5)crash='Hit the ground at '+hit.toFixed(1)+' m/s. Catch it with throttle earlier.';else if(hitH>9)crash='Clipped the ground at '+(hitH*3.6).toFixed(0)+' km/h.';}
+  if(contact&&_u.y<-0.2&&V<1.5){st.turtleT+=dt;if(st.turtleT>1.2&&st.time>1)crash=crash||'Turtled. It is upside down on its props.';}else st.turtleT=0;
+  st.onGround=contact;if(!contact&&st.pos.y>0.4)st.airborne=true;
+  st.nz=_fb.y/(AC.mass*AC.g);st.wheelN=[0,0,0];
+  /* integrate */
+  st.vel.addScaledVector(_F,dt/AC.mass);st.pos.addScaledVector(st.vel,dt);
+  _Iw.set(J[0]*st.w.x,J[1]*st.w.y,J[2]*st.w.z);_gy.copy(st.w).cross(_Iw);
+  st.w.x+=(_tq.x-_gy.x)/J[0]*dt;st.w.y+=(_tq.y-_gy.y)/J[1]*dt;st.w.z+=(_tq.z-_gy.z)/J[2]*dt;st.w.clampLength(0,40);
+  const ang=st.w.length()*dt;if(ang>0){_dq.setFromAxisAngle(_ax.copy(st.w).normalize(),ang);st.q.multiply(_dq).normalize();}
+  st.V=V;st.alpha=0;st.beta=0;st.stall=0;st.vsi=st.vel.y;st.surf='strip';if(V>st.maxV)st.maxV=V;if(st.pos.y>st.maxAlt)st.maxAlt=st.pos.y;
+  st.propAngle+=mot*AC.KV*AC.cells*4.2/60*6.28*0.02*dt;
+  return crash;
+}
+return {AC,create,step,ocv,clamp,thrustFactor,rateCurve};
 })(typeof THREE!=='undefined'?THREE:require('three'));
 /*SIM-END*/
 if(typeof module!=='undefined')module.exports=Sim;

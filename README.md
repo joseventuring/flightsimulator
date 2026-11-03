@@ -1,8 +1,10 @@
 # JG RoveaRange: Flight Simulator (repo: flightsimulator)
 
-Jinu's Garage RC flight simulator on the Kurianad field. Six aircraft so far: CraycleCub V2 (trainer), Kestrel 900, Talon 760, Arrow S-05 (1.2 m sport, flaps), Vortex X-06 (3D, hovers on the prop) and Comet J-09 (70 mm EDF jet with retracts). Freefly, a six-gate course and the Coast Wardens career.
+Jinu's Garage RC flight simulator on the Kurianad field. Seven aircraft so far: CraycleCub V2 (trainer), Kestrel 900, Talon 760, Arrow S-05 (1.2 m sport, flaps), Vortex X-06 (3D, hovers on the prop), Comet J-09 (70 mm EDF jet with retracts) and Sprint Q-16 (5 inch FPV quad with a Betaflight-style flight controller: Acro, Horizon, Angle, airmode). Freefly, a six-gate course and the Coast Wardens career.
 
-Keys: U gear, F flaps (or map transmitter switches).
+Keys: U gear, F flaps (or map transmitter switches). G cycles the stabiliser, which on the quad picks Acro, Horizon or Angle. C cycles Pilot, Chase and FPV (the quad's FPV camera is tilted up 25 degrees).
+
+Tests: `npm test` runs the fixed-wing fleet test and the quad test; CI runs them before building installers.
 
 One HTML file (`index.html`) does everything. Electron wraps the same file into Mac, Windows and Linux installers.
 

@@ -254,6 +254,9 @@ body.mobile #marshal{max-width:min(420px,46vw)}
   #overlay{padding-top:10px;padding-bottom:10px}
   #overlay.side{justify-content:center;background:rgba(27,34,43,.4)}
   #overlay.side .card{width:min(760px,100%)}
+  /* phone hangar: dock the panel right so the aircraft stays in view on the left, like desktop */
+  body.hg #overlay.side{justify-content:flex-end;background:transparent;padding-right:max(10px,env(safe-area-inset-right,0px))}
+  body.hg #overlay.side .card{width:min(560px,60vw);max-height:100%;overflow-y:auto}
   .ci{padding:5px 9px;font-size:14px}
   .stat b{font-size:17px}
 }
@@ -335,7 +338,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.8</div>
+        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.9</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -530,13 +533,14 @@ function thrustFactor(P,u){if(P.edf){const x=Math.max(u,0)/P.Vpitch,s=Math.sqrt(
 function create(){
   return {pos:new V3(0,AC.spawnY||0.11,0),gearPos:0,vel:new V3(),q:new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),AC.spawnPitch===undefined?0.15:AC.spawnPitch),w:new V3(),
     thr:0,T:0,time:0,usedAh:0,volt:AC.cells*4.2,amp:0,soc:1,onGround:true,airborne:false,alpha:0,beta:0,V:0,nz:1,stall:0,
-    touchdown:null,maxV:0,maxAlt:0,wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
+    touchdown:null,maxV:0,maxAlt:0,mT:[0,0,0,0],iw:new V3(),air:false,turtleT:0,motor:[0,0,0,0],wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
 }
 // scratch
 const _qi=new THREE.Quaternion(),_va=new V3(),_vb=new V3(),_F=new V3(),_tq=new V3(),_pw=new V3(),_ww=new V3(),_rw=new V3(),_vw=new V3(),
       _axle=new V3(),_roll=new V3(),_Fw=new V3(),_Fb=new V3(),_rxF=new V3(),_up=new V3(0,1,0),_dq=new THREE.Quaternion(),_ax=new V3(),_Iw=new V3(),_gy=new V3();
 /* inp: {ail,ele,rud:-1..1, thr:0..1}; env: {wind:V3 world, rho, surfaceAt(x,z)->'strip'|'grass'} ; returns crash reason or null */
 function step(st,inp,dt,env){
+  if(AC.kind==='quad')return stepQuad(st,inp,dt,env);
   st.time+=dt;
   const rho=env.rho||1.18;
   _qi.copy(st.q).invert();
@@ -660,7 +664,83 @@ function step(st,inp,dt,env){
   st.propAngle+=(st.thr*AC.KV*AC.cells*4.2/60*6.28*0.02+V*2)*dt;
   return crash;
 }
-return {AC,create,step,ocv,clamp,thrustFactor};
+
+/* ---------- multirotor: four motors, a Betaflight-style flight controller, rotor and body drag ----------
+   Body frame (three.js): x right, y up (thrust), z aft. Motors in an X: FL, FR, RL, RR. Props-in rotation:
+   FL and RR clockwise, FR and RL counter-clockwise seen from above; a prop's drag torque yaws the frame the other way.
+   Flight modes: 0 Acro (sticks command rotation rates), 1 Horizon (self-levels near centre stick, acro at full stick),
+   2 Angle (sticks command a tilt angle, the craft levels itself). Airmode keeps full authority at zero throttle once armed. */
+const _mq=[new V3(),new V3(),new V3(),new V3()],_u=new V3(),_d=new V3(),_f=new V3(),_r=new V3(),_e=new V3(),_wd=new V3(),_cp=new V3(),_cv=new V3(),_fb=new V3();
+const MOT=[[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]]; // [x sign, z sign, spin: +1 counter-clockwise from above]
+function rateCurve(s,max){const a=Math.abs(s);return Math.sign(s)*(AC.rateC*a+(max-AC.rateC)*a*a*a)*Math.PI/180;}
+function stepQuad(st,inp,dt,env){
+  st.time+=dt;const rho=env.rho||1.18,a=AC.arm,Tm=AC.Tmax/4,J=[AC.Ipitch,AC.Iyaw,AC.Iroll];
+  _qi.copy(st.q).invert();_va.copy(st.vel).sub(env.wind);const V=_va.length();_vb.copy(_va).applyQuaternion(_qi);
+  const battF=Math.pow(st.volt/(AC.cells*4.2),2);const armed=inp.arm!==false;const thr=armed?clamp(inp.thr,0,1):0;
+  if(thr>0.25)st.air=true;
+  /* stick to rate command */
+  const mode=inp.mode|0;
+  const acroX=rateCurve(inp.ele,AC.rateMax),acroZ=-rateCurve(inp.ail,AC.rateMax),wy=-rateCurve(inp.rud,AC.yawMax);
+  let wx=acroX,wz=acroZ;
+  if(mode>0){ // angle loop: tilt the body up-vector toward the one the sticks ask for
+    _u.set(0,1,0).applyQuaternion(st.q);_f.set(0,0,-1).applyQuaternion(st.q);_f.y=0;if(_f.lengthSq()<1e-4)_f.set(0,0,-1).applyQuaternion(st.q).setY(0).add(_u.clone().setY(0).multiplyScalar(-1));_f.normalize();
+    _r.set(-_f.z,0,_f.x);const mA=AC.maxAngle*Math.PI/180;
+    _d.set(0,1,0).addScaledVector(_r,Math.tan(inp.ail*mA)).addScaledVector(_f,-Math.tan(inp.ele*mA)).normalize();
+    _e.copy(_u).cross(_d);const sn=_e.length(),cs=_u.dot(_d);const ang=Math.atan2(sn,cs);if(sn>1e-6)_e.multiplyScalar(ang/sn);else if(cs<0)_e.set(0,0,Math.PI);
+    _e.applyQuaternion(_qi);const ax=clamp(AC.kAngle*_e.x,-AC.rateMax*0.0175,AC.rateMax*0.0175),az=clamp(AC.kAngle*_e.z,-AC.rateMax*0.0175,AC.rateMax*0.0175);
+    if(mode===2){wx=ax;wz=az;}else{const k=Math.min(1,Math.max(Math.abs(inp.ail),Math.abs(inp.ele)));const h=k*k;wx=ax*(1-h)+acroX*h;wz=az*(1-h)+acroZ*h;}
+  }
+  _wd.set(wx,wy,wz);
+  /* rate PID to torque */
+  const on=armed&&(thr>0.02||st.air);
+  const ex=_wd.x-st.w.x,ey=_wd.y-st.w.y,ez=_wd.z-st.w.z;
+  if(on&&!st.onGround){st.iw.x=clamp(st.iw.x+ex*dt,-0.5,0.5);st.iw.y=clamp(st.iw.y+ey*dt,-0.5,0.5);st.iw.z=clamp(st.iw.z+ez*dt,-0.5,0.5);}else st.iw.multiplyScalar(0.9);
+  /* D on the gyro (not the error), as Betaflight does: damps the motor-lag overshoot without kicking on stick moves */
+  const kD=AC.kD||0;if(!st.pw)st.pw=st.w.clone();const dx=(st.w.x-st.pw.x)/dt,dy=(st.w.y-st.pw.y)/dt,dz=(st.w.z-st.pw.z)/dt;st.pw.copy(st.w);
+  const tx=J[0]*(AC.kP*ex+AC.kI*st.iw.x-kD*dx),ty=J[1]*(AC.kPy*ey+AC.kI*st.iw.y-kD*0.5*dy),tz=J[2]*(AC.kP*ez+AC.kI*st.iw.z-kD*dz);
+  /* mixer with airmode: thrust per motor = collective + attitude terms, shifted (never clipped) to stay inside idle..full */
+  const Tb=Tm*Math.pow(thr,AC.thrExp),Tidle=on?Tm*0.03:0;const c=[0,0,0,0];
+  for(let i=0;i<4;i++){const [sx,sz,dir]=MOT[i];c[i]=(on?Tb:0)+(on?(tx*(-sz*a)/(4*a*a)+tz*(sx*a)/(4*a*a)+ty*(-dir)/(4*AC.kQ)):0);}
+  if(on){let lo=Math.min(...c),hi=Math.max(...c);const span=hi-lo,room=Tm-Tidle;
+    if(span>room){const mid=(hi+lo)/2,k=room/span;for(let i=0;i<4;i++)c[i]=mid+(c[i]-mid)*k;lo=Math.min(...c);hi=Math.max(...c);}
+    const lim=st.air?Tidle:0;if(lo<lim){const sh=lim-lo;for(let i=0;i<4;i++)c[i]+=sh;}hi=Math.max(...c);if(hi>Tm){const sh=hi-Tm;for(let i=0;i<4;i++)c[i]-=sh;}
+    for(let i=0;i<4;i++)c[i]=clamp(c[i],0,Tm);}
+  /* motors: first-order spin-up, thrust falls with inflow through the disc, a little ground effect */
+  const inflow=clamp(1-_vb.y/AC.Vpitch,0,1.15),ge=1+0.12*Math.exp(-Math.max(st.pos.y,0)/0.25);let Tsum=0,Lx=0,Ly=0,Lz=0,mot=0;
+  for(let i=0;i<4;i++){st.mT[i]+=(c[i]-st.mT[i])*(1-Math.exp(-dt/AC.motorTau));const T=st.mT[i]*battF*inflow*ge;const [sx,sz,dir]=MOT[i];
+    Tsum+=T;Lx+=-sz*a*T;Lz+=sx*a*T;Ly+=-dir*AC.kQ*T;st.motor[i]=Math.sqrt(st.mT[i]/Tm);mot+=st.motor[i]/4;}
+  st.T=Tsum;st.thr=mot;
+  /* forces in body axes: thrust, rotor drag (H-force, grows with thrust), body drag per axis */
+  const sp=Math.hypot(_vb.x,_vb.z);
+  _fb.set(-AC.kH*Tsum*_vb.x-0.5*rho*AC.CdA[0]*V*_vb.x, Tsum-0.5*rho*AC.CdA[1]*V*_vb.y, -AC.kH*Tsum*_vb.z-0.5*rho*AC.CdA[2]*V*_vb.z);
+  _F.copy(_fb).applyQuaternion(st.q);_F.y-=AC.mass*AC.g;
+  _tq.set(Lx-0.0006*st.w.x,Ly-0.0006*st.w.y,Lz-0.0006*st.w.z);
+  /* battery: current follows motor power, roughly thrust^1.5 */
+  let pw=0;for(let i=0;i<4;i++)pw+=Math.pow(st.mT[i]/Tm,1.5)/4;
+  st.amp=(on?AC.Iidle:0)+AC.Imax*pw;st.usedAh+=st.amp*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);
+  /* ground: frame contact points, spring-damper with friction; hard hits and turtling end the flight */
+  let contact=false,hit=0,hitH=0,crash=null;
+  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=-_pw.y;if(pen<=0)continue;
+    _ww.copy(st.w).applyQuaternion(st.q);_rw.copy(p).applyQuaternion(st.q);_cv.copy(_ww).cross(_rw).add(st.vel);
+    let N=AC.kWheel*pen-AC.cWheel*_cv.y;if(N<0)N=0;const vt=Math.hypot(_cv.x,_cv.z);
+    _Fw.set(0,N,0);if(vt>1e-4){const f=Math.min(0.6*N,AC.mass*vt/dt*0.25);_Fw.x-=f*_cv.x/vt;_Fw.z-=f*_cv.z/vt;}
+    _F.add(_Fw);_Fb.copy(_Fw).applyQuaternion(_qi);_tq.add(_rxF.copy(p).cross(_Fb));contact=true;if(-_cv.y>hit)hit=-_cv.y;if(vt>hitH)hitH=vt;}
+  _u.set(0,1,0).applyQuaternion(st.q);
+  if(contact&&!st.onGround&&st.airborne){st.touchdown={sink:hit,speed:V,t:st.time};
+    if(hit>4.5)crash='Hit the ground at '+hit.toFixed(1)+' m/s. Catch it with throttle earlier.';else if(hitH>9)crash='Clipped the ground at '+(hitH*3.6).toFixed(0)+' km/h.';}
+  if(contact&&_u.y<-0.2&&V<1.5){st.turtleT+=dt;if(st.turtleT>1.2&&st.time>1)crash=crash||'Turtled. It is upside down on its props.';}else st.turtleT=0;
+  st.onGround=contact;if(!contact&&st.pos.y>0.4)st.airborne=true;
+  st.nz=_fb.y/(AC.mass*AC.g);st.wheelN=[0,0,0];
+  /* integrate */
+  st.vel.addScaledVector(_F,dt/AC.mass);st.pos.addScaledVector(st.vel,dt);
+  _Iw.set(J[0]*st.w.x,J[1]*st.w.y,J[2]*st.w.z);_gy.copy(st.w).cross(_Iw);
+  st.w.x+=(_tq.x-_gy.x)/J[0]*dt;st.w.y+=(_tq.y-_gy.y)/J[1]*dt;st.w.z+=(_tq.z-_gy.z)/J[2]*dt;st.w.clampLength(0,40);
+  const ang=st.w.length()*dt;if(ang>0){_dq.setFromAxisAngle(_ax.copy(st.w).normalize(),ang);st.q.multiply(_dq).normalize();}
+  st.V=V;st.alpha=0;st.beta=0;st.stall=0;st.vsi=st.vel.y;st.surf='strip';if(V>st.maxV)st.maxV=V;if(st.pos.y>st.maxAlt)st.maxAlt=st.pos.y;
+  st.propAngle+=mot*AC.KV*AC.cells*4.2/60*6.28*0.02*dt;
+  return crash;
+}
+return {AC,create,step,ocv,clamp,thrustFactor,rateCurve};
 })(THREE);
 
 const $=id=>document.getElementById(id);
@@ -856,6 +936,14 @@ const AIRCRAFT={
       Ipitch:0.06,Iroll:0.04,Iyaw:0.09,cells:6,capAh:3.3,Imax:65,KV:1950,blades:12,features:{flaps:true,gear:true},
       wheels:[{p:V(-0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0,-0.145,-0.30),r:0.025,steer:-0.25}]},
     tail:[0.40,0.035],paint:{primary:'#F2EFE8',secondary:'#1B222B',accent:'#1F4E79'}},
+  sprint:{id:'sprint',name:'Sprint Q-16',role:'FPV quad',kind:'quad',price:3500,blurb:'5 inch freestyle quad, 650 g on 6S, eight times more thrust than weight. Acro by default like a real FPV quad: the sticks set rotation rates and nothing levels it for you. Horizon and Angle are on the stabiliser button.',
+    geom:{quad:true,k:1,arm:0.0795,propR:0.0635},
+    phys:{name:'Sprint Q-16',kind:'quad',mass:0.65,span:0.225,arm:0.0795,Tmax:54,thrExp:1.6,Vpitch:48,motorTau:0.03,kQ:0.016,kH:0.006,CdA:[0.010,0.020,0.008],
+      Ipitch:0.0016,Iroll:0.0013,Iyaw:0.0026,rateC:200,rateMax:720,yawMax:450,maxAngle:55,kAngle:7,kP:60,kPy:30,kI:15,kD:1.2,
+      cells:6,capAh:1.1,Imax:120,Iidle:0.6,rCell:0.005,KV:1750,blades:3,propD:0.127,kWheel:2500,cWheel:20,alarmV:3.5,spawnY:0.022,
+      contacts:[{x:-0.0795,y:-0.02,z:-0.0795},{x:0.0795,y:-0.02,z:-0.0795},{x:-0.0795,y:-0.02,z:0.0795},{x:0.0795,y:-0.02,z:0.0795},{x:0,y:0.075,z:0},{x:0,y:0.0,z:-0.075},{x:0,y:0.0,z:0.08},
+        {x:-0.0795,y:0.03,z:-0.0795},{x:0.0795,y:0.03,z:-0.0795},{x:-0.0795,y:0.03,z:0.0795},{x:0.0795,y:0.03,z:0.0795}],features:{flaps:false,gear:false}},
+    paint:{primary:'#E8503A',secondary:'#1B222B',accent:'#F5C542'}},
 };
 /* gear springs scale with weight so every aircraft sits and rebounds like the 620 g Cub they were tuned on */
 ['arrow','vortex','comet'].forEach(id=>{const A=AIRCRAFT[id],m=A.phys.mass/0.62;Object.assign(A.phys,tailFrom(A.geom,A.phys,A.tail[0],A.tail[1]),{crashPts:crashFrom(A.geom,A.geom.propR),kWheel:600*m,cWheel:12*Math.sqrt(m)});});
@@ -875,7 +963,8 @@ function upOf(id){return Object.assign({motor:0,battery:0,prop:0},career.up[id]|
 function paintOf(id){return Object.assign({},AIRCRAFT[id].paint,career.paint[id]||{});}
 /* apply an aircraft and its upgrades to the live flight model */
 const toV=o=>new THREE.Vector3(o.x,o.y,o.z);
-function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wheels','crashPts','wingPos','tailPos','finPos','features'];
+function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wheels','crashPts','wingPos','tailPos','finPos','features','contacts'];
+  for(const k in AC){if(!(k in AC_BASE))delete AC[k];} // a quad's fields must not leak into the next plane
   for(const k in AC_BASE){if(vec.includes(k))continue;AC[k]=AC_BASE[k];}
   ['wingPos','tailPos','finPos'].forEach(k=>AC[k]=toV(A.phys[k]||AC_BASE[k]));
   AC.wheels=(A.phys.wheels||AC_BASE.wheels).map(w=>({p:w.p.clone(),r:w.r,steer:w.steer}));
@@ -885,6 +974,7 @@ function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wh
   const sc=A.phys.span/0.8;
   AC.crashPts=A.phys.crashPts?A.phys.crashPts.map(([n,p])=>[n,toV(p)]):AC_BASE.crashPts.map(([n,p])=>[n,new THREE.Vector3(p.x*sc,p.y,p.z*A.geom.k)]);
   AC.features=Object.assign({flaps:false,gear:false},A.phys.features||{});
+  if(AC.kind==='quad'){AC.contacts=A.phys.contacts.map(toV);AC.wheels=[];AC.crashPts=[];AC.spawnPitch=0;AC.spawnY=A.phys.spawnY;return;}
   /* resting attitude: the angle that puts the main wheels and the third wheel on the ground together */
   const W=AC.wheels,ym=W[0].p.y-W[0].r,yt=W[2].p.y-W[2].r,th=Math.atan((ym-yt)/(W[0].p.z-W[2].p.z));
   AC.spawnPitch=th;AC.spawnY=-(ym*Math.cos(th)-W[0].p.z*Math.sin(th))+0.002;}
@@ -892,6 +982,16 @@ function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wh
 /* the pack a battery upgrade gives this aircraft, e.g. 4S 3000 */
 function packName(id,i){const P=Object.assign({},AC_BASE,AIRCRAFT[id].phys);return P.cells+'S '+Math.round(P.capAh*UPGRADES.battery[i].cap*10)*100;}
 function statsOf(id){const A=AIRCRAFT[id],u=upOf(id);const P=Object.assign({},AC_BASE,A.phys);const m=UPGRADES.motor[u.motor],b=UPGRADES.battery[u.battery],p=UPGRADES.prop[u.prop];
+  if(P.kind==='quad'){/* top speed: full power, tilted until thrust only just holds height; rotor and body drag balance what is left */
+    const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass*(1+b.dm),W=mass*9.81;let vmax=0;
+    /* same terms as the sim: inflow through the tilted disc, sag at full current, body drag on both axes, rotor drag.
+       For each speed find the tilt that holds height, then check there is still forward force left. */
+    const sag=Math.pow((4.1-P.Imax*m.I*P.rCell)/4.2,2),r=0.5*1.18;
+    const net=(v,th)=>{const vy=v*Math.sin(th),vz=v*Math.cos(th),Te=T*sag*Math.max(0,1-vy/Vp);const Fy=Te-r*P.CdA[1]*v*vy,Ff=-(P.kH*Te*vz+r*P.CdA[2]*v*vz);
+      return [Fy*Math.cos(th)-Ff*Math.sin(th)-W,Fy*Math.sin(th)+Ff*Math.cos(th)];};
+    for(let v=1;v<90;v+=0.5){let ok=false;for(let th=0.02;th<1.55;th+=0.01){const [up,fw]=net(v,th);if(up<0)break;if(fw>0)ok=true;}if(!ok)break;vmax=v;}
+    const hov=Math.pow(W/T,1/P.thrExp),Ih=P.Iidle+P.Imax*m.I*Math.pow(W/T,1.5);
+    return {quad:true,vmax:vmax*3.6,vs:hov*100,climb:T/W,roll:P.rateMax,endur:P.capAh*b.cap*0.72/Ih*60};}
   const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass*(1+b.dm),CL=P.CL0+P.CLa*P.aStall;
   const vs=Math.sqrt(2*mass*9.81/(1.18*P.S*CL))*3.6;
   let v=10;for(let i=0;i<80;i++){const thrust=T*Math.max(0,Sim.thrustFactor({edf:P.edf,Vpitch:Vp},v));const D=0.5*1.18*v*v*P.S*(P.CD0+0.015);v+=(thrust-D)*0.4;v=Math.max(5,v);}
@@ -1004,8 +1104,42 @@ function buildAircraft(spec,paint,wheels){
     if(main&&!G0.edf)rodTo(holder,new THREE.Vector3(0,0.005,0.05),hub.position.clone(),0.0024,matMetal);
     legs.push({g:leg,main,side:Math.sign(W.p.x)||1,sgn:Math.sign(W.steer||1)});});
   return {root,propHub,propDisc,steer,legs,retracts:!!(spec.phys&&spec.phys.features&&spec.phys.features.gear),surf:{ailL:wL.hinge,ailR:wR.hinge,elev,rudd:rud,flapL:wL.flap,flapR:wR.flap}};}
+
+/* ---------- 5 inch FPV quad: carbon X frame, stack, battery on top, tilted camera, 2306 motors, triblade props ---------- */
+function buildQuad(spec,paint){const g=spec.geom,a=g.arm,R=g.propR,root=new THREE.Group();
+  const carbon=new THREE.MeshStandardMaterial({color:0x17191c,roughness:0.45,metalness:0.25}),mP=pbr(new THREE.Color(paint.primary).getHex(),0.55),mS=pbr(new THREE.Color(paint.secondary).getHex(),0.6),mA=new THREE.Color(paint.accent).getHex();
+  [-1,1].forEach(s=>{const arm=sh(new THREE.Mesh(new THREE.BoxGeometry(0.017,0.005,Math.SQRT2*a*2+0.02),carbon));arm.rotation.y=s*Math.PI/4;arm.position.y=0.002;root.add(arm);});
+  const bot=sh(new THREE.Mesh(new THREE.BoxGeometry(0.042,0.004,0.11),carbon));bot.position.y=0.004;root.add(bot);
+  const top=sh(new THREE.Mesh(new THREE.BoxGeometry(0.04,0.003,0.09),carbon));top.position.y=0.034;root.add(top);
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([x,z])=>{const so=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.0025,0.0025,0.03,6),matMetal));so.position.set(x*0.016,0.019,z*0.04);root.add(so);});
+  const stack=sh(new THREE.Mesh(new THREE.BoxGeometry(0.03,0.016,0.03),pbr(0x1d5a3a,0.6)));stack.position.set(0,0.016,0.005);root.add(stack);
+  const batt=sh(new THREE.Mesh(new THREE.BoxGeometry(0.035,0.032,0.072),mS));batt.position.set(0,0.053,0.004);root.add(batt);
+  const strap=sh(new THREE.Mesh(new THREE.BoxGeometry(0.038,0.035,0.012),mP));strap.position.set(0,0.053,0.004);root.add(strap);
+  const camG=new THREE.Group();camG.position.set(0,0.019,-0.05);camG.rotation.x=25*Math.PI/180;root.add(camG);
+  const cam=sh(new THREE.Mesh(new THREE.BoxGeometry(0.019,0.019,0.02),pbr(0x101214,0.5)));camG.add(cam);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.007,0.008,0.01,14),matGlass);lens.rotation.x=Math.PI/2;lens.position.z=-0.014;camG.add(lens);
+  [-1,1].forEach(s=>{const side=sh(new THREE.Mesh(new THREE.BoxGeometry(0.004,0.03,0.035),mP));side.position.set(s*0.017,0.019,-0.045);root.add(side);});
+  rodTo(root,new THREE.Vector3(0,0.03,0.05),new THREE.Vector3(0,0.075,0.085),0.0012,pbr(0x111111,0.6));
+  const ant=new THREE.Mesh(new THREE.SphereGeometry(0.004,8,6),mP);ant.position.set(0,0.077,0.087);root.add(ant);
+  const props=[],M=[[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]];
+  const bladeS=new THREE.Shape();bladeS.moveTo(0,-0.004);bladeS.quadraticCurveTo(R*0.45,-0.011,R,-0.004);bladeS.quadraticCurveTo(R*1.03,0,R,0.003);bladeS.quadraticCurveTo(R*0.5,0.008,0,0.004);
+  const bladeG=new THREE.ShapeGeometry(bladeS);bladeG.rotateX(-Math.PI/2);
+  M.forEach(([sx,sz,dir])=>{const x=sx*a,z=sz*a;
+    const bell=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.0145,0.0145,0.012,16),matMetal));bell.position.set(x,0.014,z);root.add(bell);
+    const base=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.013,0.013,0.006,16),carbon));base.position.set(x,0.006,z);root.add(base);
+    const pg=new THREE.Group();pg.position.set(x,0.024,z);root.add(pg);
+    const bm=new THREE.MeshStandardMaterial({color:mA,roughness:0.4,transparent:true,opacity:0.92,side:THREE.DoubleSide});const blades=[];
+    for(let k=0;k<3;k++){const b=new THREE.Mesh(bladeG,bm);b.rotation.y=k*Math.PI*2/3;b.rotation.z=dir*0.12;pg.add(b);blades.push(b);}
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.008,10),bm);pg.add(hub);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(R,32),new THREE.MeshBasicMaterial({color:mA,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.rotation.x=-Math.PI/2;pg.add(disc);
+    props.push({g:pg,dir,blades,disc});});
+  const dummy=()=>{const o=new THREE.Group();root.add(o);return o;};
+  const propHub=dummy(),propDisc=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({visible:false}));root.add(propDisc);
+  return {root,propHub,propDisc,steer:dummy(),legs:[],retracts:false,props,surf:{ailL:dummy(),ailR:dummy(),elev:dummy(),rudd:dummy(),flapL:dummy(),flapR:dummy()}};}
 const THROW={ail:0.45,ele:0.38,rud:0.5};
-function animateCraft(c,inp,gp){c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
+function animateCraft(c,inp,gp){
+  if(c.props){/* props spin with each motor's own speed; past a third of full speed the blades blur into a disc */
+    c.props.forEach((P,i)=>{const m=(typeof st!=='undefined'&&st.motor)?st.motor[i]:0;P.g.rotation.y+=P.dir*(m*4.2+(m>0.01?0.6:0));P.blades.forEach(b=>b.visible=m<0.35);P.disc.material.opacity=clamp((m-0.2)*0.9,0,0.38);});return;}c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
   /* the steerable wheel turns through the same angle the physics uses: tailwheels follow the rudder, nosewheels turn against it */
   const sw=(c.legs&&c.legs[2])?c.legs[2].sgn:1;c.steer.rotation.y=sw*inp.rud*0.35;
   if(c.retracts){gp=gp||0;c.legs.forEach(L=>{if(L.main)L.g.rotation.z=-L.side*gp*1.5;else L.g.rotation.x=-gp*1.55;L.g.visible=gp<0.97;});}}
@@ -1013,7 +1147,7 @@ function animateCraft(c,inp,gp){c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.
 const plane=new THREE.Group();scene.add(plane);
 let craft=null,surf=null,propHub=null,propDisc=null,loadedId=null;
 function disposeTree(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();m.dispose();});}});}
-function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
+function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=AIRCRAFT[id].kind==='quad'?buildQuad(AIRCRAFT[id],paintOf(id)):buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);if(typeof applyStabLabel==='function')applyStabLabel();plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
 function animateSurfaces(IN){animateCraft(craft,IN,st.gearPos);}
 loadPlayerAircraft(career.selected);
 
@@ -1138,7 +1272,7 @@ function setSticks(on){settings.sticks=on;document.body.classList.toggle('touch'
 
 /* flight controller mixer (like a trainer receiver gyro): Off / Assist (rate damping) / Self-level (attitude hold, 45° bank limit) */
 function stabMix(a,e,r){
-  const mode=G.stab; if(mode===0||!st.airborne||st.onGround)return [a,e,r];
+  const mode=G.stab; if(AC.kind==='quad'||mode===0||!st.airborne||st.onGround)return [a,e,r];
   const p=-st.w.z, q=st.w.x, yaw=-st.w.y;
   if(mode===1){return [clamp(a-0.06*p,-1,1),clamp(e-0.05*q,-1,1),clamp(r-0.04*yaw,-1,1)];}
   const att=attitude();const roll=-att.roll, pitch=att.pitch; // attitude().roll is +left-wing-down (ADI convention); controls use +right
@@ -1177,6 +1311,7 @@ function readInput(){
   IN.thr=G.cut?0:clamp(t,0,1);IN.src=src;
   IN.flap=AC.features.flaps?[0,0.26,0.61][G.flapPos]:0;
   IN.gear=AC.features.gear&&G.gearUp?1:0;
+  IN.mode=G.stab;IN.arm=!G.cut; // quads: the stabiliser button picks the flight-controller mode
 }
 
 /* gear and flap toggles for keyboard and touch; a mapped transmitter switch overrides them on the next frame */
@@ -1442,9 +1577,9 @@ const onAll=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventList
 const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard','winCard','logCard','pauseCard','fieldCard','careerCard','purCard'];
 const SIDE=new Set(['hangarCard','txCard','preCard']);   // docked right, the aircraft stays visible
 let screenStack=[];
-function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');G.view=side?'hangar':'fly';
+function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');document.body.classList.toggle('hg',id==='hangarCard');G.view=side?'hangar':'fly';
   if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();if(id!=='hangarCard'&&!G.flying&&typeof loadedId!=='undefined'&&loadedId&&loadedId!==career.selected)loadPlayerAircraft(career.selected);}
-function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre');G.view='fly';screenStack=[];}
+function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre','hg');G.view='fly';screenStack=[];}
 function back(){screenStack.pop();const prev=screenStack.pop();if(prev)show(prev);else if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.crashed)show('crashCard');else if(G.flying)hide();else show('menuCard');}
 function togglePause(){if(!G.flying||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.flying&&!G.paused&&$('overlay').hidden&&!G.crashed&&!G.landed){G.paused=true;show('pauseCard');}});
@@ -1490,6 +1625,9 @@ function checkGate(){
 const camPos=new THREE.Vector3(0,1.2,3),camLook=new THREE.Vector3();
 const FWD=new THREE.Vector3(0,0,-1);
 let hangarAngle=0;
+const QUP=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),25*Math.PI/180);
+const _hq=new THREE.Quaternion(),_hf=new THREE.Vector3();
+function headingQ(){_hf.set(0,0,-1).applyQuaternion(st.q);const h=Math.atan2(-_hf.x,-_hf.z);if(_hf.x*_hf.x+_hf.z*_hf.z>0.01)headingQ.h=h;return _hq.setFromAxisAngle(new THREE.Vector3(0,1,0),headingQ.h||0);}
 const CAMS=['pilot','chase','fpv'],CAMN={pilot:'Pilot',chase:'Chase',fpv:'FPV'};
 function cycleCam(){G.cam=CAMS[(CAMS.indexOf(G.cam)+1)%3];document.querySelectorAll('[data-cam]').forEach(b=>b.textContent=CAMN[G.cam]);}
 /* model marker: constant-size ring when the model is far, a standard aid in RC sims */
@@ -1500,14 +1638,15 @@ function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2
   marker.position.copy(st.pos);const sz=viewH*(MOBILE?0.075:0.055);marker.scale.set(sz,sz,1);
   marker.visible=G.flying&&G.view==='fly'&&G.cam==='pilot'&&modelFrac<0.06;marker.material.opacity=clamp((0.06-modelFrac)/0.03,0,0.85);}
 function updateCamera(dt){
-  if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const sc=Math.max(1,AC.span/0.8);const want=new THREE.Vector3(Math.sin(a)*1.35*sc,0.62*sc,Math.cos(a)*1.35*sc).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
+  if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const sc=AC.kind==='quad'?0.5:Math.max(1,AC.span/0.8);const want=new THREE.Vector3(Math.sin(a)*1.35*sc,0.62*sc,Math.cos(a)*1.35*sc).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
   if(camera.view&&camera.view.enabled)camera.clearViewOffset();
   if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*12));camera.lookAt(camLook);
     /* Auto-zoom like RealFlight: keep the model readable but never zoom so far that the horizon and field drop out of view.
        Model fills about 1/6 of the screen height when it can; the lens never goes narrower than 18 deg (phone) or 15 deg (desktop). */
     const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(AC.span*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
     camera.fov+=(want-camera.fov)*(1-Math.exp(-dt*3));camera.updateProjectionMatrix();}
-  else if(G.cam==='chase'){const cs=Math.max(1,AC.span/0.8);const target=new THREE.Vector3(0,0.45*cs,2.0*cs).applyQuaternion(st.q).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*(5+0.3*st.V)));camPos.y=Math.max(camPos.y,0.25);/* follow rate rises with speed so the trailing lag stays near 2 m on the jet too */camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(st.q),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
+  else if(G.cam==='chase'){const cs=Math.max(1,AC.span/0.8);const cq=AC.kind==='quad'?headingQ():st.q;/* a quad flips; the chase camera follows its heading, not its attitude */const target=new THREE.Vector3(0,0.45*cs,2.0*cs).applyQuaternion(cq).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*(5+0.3*st.V)));camPos.y=Math.max(camPos.y,0.25);/* follow rate rises with speed so the trailing lag stays near 2 m on the jet too */camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(cq),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
+  else if(AC.kind==='quad'){/* FPV camera tilted up 25 deg, the usual freestyle angle: level hover looks at the ground, forward flight looks ahead */camera.position.copy(new THREE.Vector3(0,0.012,-0.07).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q).multiply(QUP);camera.fov=92;camera.updateProjectionMatrix();}
   else{camera.position.copy(new THREE.Vector3(0,0.1*Math.max(1,AC.span/0.8),-0.19*AIRCRAFT[loadedId].geom.k).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
   if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}
   const buffet=st.stall*0.004*(G.cam==='fpv'?1:0);if(buffet>0&&!reduceMotion){camera.rotation.z+=buffet*Math.sin(performance.now()/1000*40);}
@@ -1536,7 +1675,7 @@ function renderHangar(){const id=hgView,A=AIRCRAFT[id],own=career.owned.includes
   $('hgPlanes').innerHTML=Object.values(AIRCRAFT).map(P=>{const o=career.owned.includes(P.id);return `<div class="pl${P.id===id?' sel':''}" data-pl="${P.id}"><b>${P.name}</b><small>${P.role}</small><span class="tag ${o?'own':'lock'}">${P.id===career.selected?'Flying':o?'Owned':P.price+' cr'}</span></div>`;}).join('');
   $('hgName').textContent=A.name+' · '+A.role;$('hgBlurb').textContent=A.blurb;
   const S=statsOf(id),row=(k,v,u,f)=>`<span>${k}</span><span class="bar"><i style="width:${clamp(f,0.04,1)*100}%"></i></span><b>${v}${u}</b>`;
-  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/200)+row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45)+row('Thrust/wt',S.climb.toFixed(2),'',S.climb/2.5)+row('Roll',S.roll.toFixed(0),' °/s',S.roll/450)+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
+  $('hgStats').innerHTML=row('Top speed',S.vmax.toFixed(0),' km/h',S.vmax/200)+(S.quad?row('Hover',S.vs.toFixed(0),'% thr',1-S.vs/60):row('Stall',S.vs.toFixed(0),' km/h',1-S.vs/45))+row('Thrust/wt',S.climb.toFixed(S.quad?1:2),'',S.climb/(S.quad?10:2.5))+row('Roll',S.roll.toFixed(0),' °/s',S.roll/(S.quad?800:450))+row('Endurance',S.endur.toFixed(1),' min',S.endur/12);
   const pt=paintOf(id);$('hgPaint').innerHTML=['primary','secondary','accent'].map(k=>`<span>${k[0].toUpperCase()+k.slice(1)}</span><span class="sw">${PAINTS.map(c=>`<button data-paint="${k}" data-c="${c}" class="${pt[k].toLowerCase()===c.toLowerCase()?'on':''}" style="background:${c}" aria-label="${k} ${c}"${own?'':' disabled'}></button>`).join('')}</span>`).join('');
   const u=upOf(id);const have=career.up[id]&&career.up[id].have||{};
   $('hgUps').innerHTML=Object.entries(UPGRADES).map(([k,list])=>`<div class="up"><span>${k[0].toUpperCase()+k.slice(1)}</span><span class="opts">${list.map((o,i)=>{const h=i===0||(have[k]||[]).includes(i);return `<button class="btn mini${u[k]===i?' cur':h?' have':''}" data-up="${k}" data-i="${i}"${own?'':' disabled'}>${k==='battery'?packName(id,i):o.name}${h?'':' · '+o.cost}</button>`;}).join('')}</span></div>`).join('');
@@ -1568,7 +1707,7 @@ function applyTelemetry(){const m=settings.tele||'full';$('hud').classList.toggl
 function showLog(){const L=logbook;$('logStats').innerHTML=[['Flights',L.flights],['Airtime',fmtTime(L.airtime)],['Longest',fmtTime(L.longest)],['Greasers',L.landings],['Firm',L.firm],['Hard',L.hard],['Crashes',L.crashes],['Violations',L.violations],['Best course',L.bestGate===null?'none':L.bestGate.toFixed(1)+' s']].map(([k,v])=>`<div><span class="lbl">${k}</span><b>${v}</b></div>`).join('');show('logCard');}
 const STABN=['Stab off','Assist','Self-level'];
 function cycleStab(){if(dev&&dev.map.stab.src){say('Stabiliser is on a transmitter switch.','warn','stabsw',3);return;}G.kStab=(G.kStab+1)%3;settings.stab=G.kStab;saveSettings();applyStabLabel();}
-function applyStabLabel(){document.querySelectorAll('[data-stab]').forEach(b=>{b.textContent=STABN[G.stab];b.classList.toggle('on',G.stab>0);});}
+function applyStabLabel(){/* runs at start-up from the model loader too, so its label lists live inside it */const N=AC.kind==='quad'?['Acro','Horizon','Angle']:['Stab off','Assist','Self-level'];document.querySelectorAll('[data-stab]').forEach(b=>{b.textContent=N[G.stab];b.classList.toggle('on',G.stab>0);});}
 function setMode(m){G.mode=m;document.querySelectorAll('[data-mode]').forEach(b=>b.textContent=m==='free'?'Freefly':m==='gates'?'Gates':'Pursuit');reset();}
 
 /* ---------- wiring ---------- */
@@ -1628,7 +1767,7 @@ function frame(now){
     else{
       if(G.mode!=='pursuit')marshal();updatePursuit(dt);
       if(G.mode==='gates')checkGate();
-      if(st.airborne&&st.onGround){if(st.V<0.8){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
+      if(st.airborne&&st.onGround){if(st.V<0.8&&(AC.kind!=='quad'||IN.thr<0.05)){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
         if(st.touchdown&&!st.touchdown.said){st.touchdown.said=true;haptic(st.touchdown.sink>1.8?80:30);feedback(st.touchdown.sink>1.8?'medium':'small',st.pos.x,0.05,st.pos.z);thud(clamp(st.touchdown.sink/2.6,0.15,0.8));say('Down. Sink '+st.touchdown.sink.toFixed(1)+' m/s at '+(st.touchdown.speed*3.6).toFixed(0)+' km/h.',st.touchdown.sink>1.8?'warn':'good');}}
       if(st.onGround&&st.surf==='grass'&&st.V>4&&Math.random()<dt*8)burst(st.pos.x,0.05,st.pos.z,2,0.6,0.6);
     }

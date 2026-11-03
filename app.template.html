@@ -244,6 +244,9 @@ body.mobile #marshal{max-width:min(420px,46vw)}
   #overlay{padding-top:10px;padding-bottom:10px}
   #overlay.side{justify-content:center;background:rgba(27,34,43,.4)}
   #overlay.side .card{width:min(760px,100%)}
+  /* phone hangar: dock the panel right so the aircraft stays in view on the left, like desktop */
+  body.hg #overlay.side{justify-content:flex-end;background:transparent;padding-right:max(10px,env(safe-area-inset-right,0px))}
+  body.hg #overlay.side .card{width:min(560px,60vw);max-height:100%;overflow-y:auto}
   .ci{padding:5px 9px;font-size:14px}
   .stat b{font-size:17px}
 }
@@ -323,7 +326,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.8</div>
+        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.9</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -550,7 +553,7 @@ function frame(now){
     else{
       if(G.mode!=='pursuit')marshal();updatePursuit(dt);
       if(G.mode==='gates')checkGate();
-      if(st.airborne&&st.onGround){if(st.V<0.8){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
+      if(st.airborne&&st.onGround){if(st.V<0.8&&(AC.kind!=='quad'||IN.thr<0.05)){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
         if(st.touchdown&&!st.touchdown.said){st.touchdown.said=true;haptic(st.touchdown.sink>1.8?80:30);feedback(st.touchdown.sink>1.8?'medium':'small',st.pos.x,0.05,st.pos.z);thud(clamp(st.touchdown.sink/2.6,0.15,0.8));say('Down. Sink '+st.touchdown.sink.toFixed(1)+' m/s at '+(st.touchdown.speed*3.6).toFixed(0)+' km/h.',st.touchdown.sink>1.8?'warn':'good');}}
       if(st.onGround&&st.surf==='grass'&&st.V>4&&Math.random()<dt*8)burst(st.pos.x,0.05,st.pos.z,2,0.6,0.6);
     }

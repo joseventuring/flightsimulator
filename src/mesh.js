@@ -103,8 +103,42 @@ function buildAircraft(spec,paint,wheels){
     if(main&&!G0.edf)rodTo(holder,new THREE.Vector3(0,0.005,0.05),hub.position.clone(),0.0024,matMetal);
     legs.push({g:leg,main,side:Math.sign(W.p.x)||1,sgn:Math.sign(W.steer||1)});});
   return {root,propHub,propDisc,steer,legs,retracts:!!(spec.phys&&spec.phys.features&&spec.phys.features.gear),surf:{ailL:wL.hinge,ailR:wR.hinge,elev,rudd:rud,flapL:wL.flap,flapR:wR.flap}};}
+
+/* ---------- 5 inch FPV quad: carbon X frame, stack, battery on top, tilted camera, 2306 motors, triblade props ---------- */
+function buildQuad(spec,paint){const g=spec.geom,a=g.arm,R=g.propR,root=new THREE.Group();
+  const carbon=new THREE.MeshStandardMaterial({color:0x17191c,roughness:0.45,metalness:0.25}),mP=pbr(new THREE.Color(paint.primary).getHex(),0.55),mS=pbr(new THREE.Color(paint.secondary).getHex(),0.6),mA=new THREE.Color(paint.accent).getHex();
+  [-1,1].forEach(s=>{const arm=sh(new THREE.Mesh(new THREE.BoxGeometry(0.017,0.005,Math.SQRT2*a*2+0.02),carbon));arm.rotation.y=s*Math.PI/4;arm.position.y=0.002;root.add(arm);});
+  const bot=sh(new THREE.Mesh(new THREE.BoxGeometry(0.042,0.004,0.11),carbon));bot.position.y=0.004;root.add(bot);
+  const top=sh(new THREE.Mesh(new THREE.BoxGeometry(0.04,0.003,0.09),carbon));top.position.y=0.034;root.add(top);
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([x,z])=>{const so=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.0025,0.0025,0.03,6),matMetal));so.position.set(x*0.016,0.019,z*0.04);root.add(so);});
+  const stack=sh(new THREE.Mesh(new THREE.BoxGeometry(0.03,0.016,0.03),pbr(0x1d5a3a,0.6)));stack.position.set(0,0.016,0.005);root.add(stack);
+  const batt=sh(new THREE.Mesh(new THREE.BoxGeometry(0.035,0.032,0.072),mS));batt.position.set(0,0.053,0.004);root.add(batt);
+  const strap=sh(new THREE.Mesh(new THREE.BoxGeometry(0.038,0.035,0.012),mP));strap.position.set(0,0.053,0.004);root.add(strap);
+  const camG=new THREE.Group();camG.position.set(0,0.019,-0.05);camG.rotation.x=25*Math.PI/180;root.add(camG);
+  const cam=sh(new THREE.Mesh(new THREE.BoxGeometry(0.019,0.019,0.02),pbr(0x101214,0.5)));camG.add(cam);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.007,0.008,0.01,14),matGlass);lens.rotation.x=Math.PI/2;lens.position.z=-0.014;camG.add(lens);
+  [-1,1].forEach(s=>{const side=sh(new THREE.Mesh(new THREE.BoxGeometry(0.004,0.03,0.035),mP));side.position.set(s*0.017,0.019,-0.045);root.add(side);});
+  rodTo(root,new THREE.Vector3(0,0.03,0.05),new THREE.Vector3(0,0.075,0.085),0.0012,pbr(0x111111,0.6));
+  const ant=new THREE.Mesh(new THREE.SphereGeometry(0.004,8,6),mP);ant.position.set(0,0.077,0.087);root.add(ant);
+  const props=[],M=[[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]];
+  const bladeS=new THREE.Shape();bladeS.moveTo(0,-0.004);bladeS.quadraticCurveTo(R*0.45,-0.011,R,-0.004);bladeS.quadraticCurveTo(R*1.03,0,R,0.003);bladeS.quadraticCurveTo(R*0.5,0.008,0,0.004);
+  const bladeG=new THREE.ShapeGeometry(bladeS);bladeG.rotateX(-Math.PI/2);
+  M.forEach(([sx,sz,dir])=>{const x=sx*a,z=sz*a;
+    const bell=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.0145,0.0145,0.012,16),matMetal));bell.position.set(x,0.014,z);root.add(bell);
+    const base=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.013,0.013,0.006,16),carbon));base.position.set(x,0.006,z);root.add(base);
+    const pg=new THREE.Group();pg.position.set(x,0.024,z);root.add(pg);
+    const bm=new THREE.MeshStandardMaterial({color:mA,roughness:0.4,transparent:true,opacity:0.92,side:THREE.DoubleSide});const blades=[];
+    for(let k=0;k<3;k++){const b=new THREE.Mesh(bladeG,bm);b.rotation.y=k*Math.PI*2/3;b.rotation.z=dir*0.12;pg.add(b);blades.push(b);}
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.008,10),bm);pg.add(hub);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(R,32),new THREE.MeshBasicMaterial({color:mA,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.rotation.x=-Math.PI/2;pg.add(disc);
+    props.push({g:pg,dir,blades,disc});});
+  const dummy=()=>{const o=new THREE.Group();root.add(o);return o;};
+  const propHub=dummy(),propDisc=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({visible:false}));root.add(propDisc);
+  return {root,propHub,propDisc,steer:dummy(),legs:[],retracts:false,props,surf:{ailL:dummy(),ailR:dummy(),elev:dummy(),rudd:dummy(),flapL:dummy(),flapR:dummy()}};}
 const THROW={ail:0.45,ele:0.38,rud:0.5};
-function animateCraft(c,inp,gp){c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
+function animateCraft(c,inp,gp){
+  if(c.props){/* props spin with each motor's own speed; past a third of full speed the blades blur into a disc */
+    c.props.forEach((P,i)=>{const m=(typeof st!=='undefined'&&st.motor)?st.motor[i]:0;P.g.rotation.y+=P.dir*(m*4.2+(m>0.01?0.6:0));P.blades.forEach(b=>b.visible=m<0.35);P.disc.material.opacity=clamp((m-0.2)*0.9,0,0.38);});return;}c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
   /* the steerable wheel turns through the same angle the physics uses: tailwheels follow the rudder, nosewheels turn against it */
   const sw=(c.legs&&c.legs[2])?c.legs[2].sgn:1;c.steer.rotation.y=sw*inp.rud*0.35;
   if(c.retracts){gp=gp||0;c.legs.forEach(L=>{if(L.main)L.g.rotation.z=-L.side*gp*1.5;else L.g.rotation.x=-gp*1.55;L.g.visible=gp<0.97;});}}
@@ -112,6 +146,6 @@ function animateCraft(c,inp,gp){c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.
 const plane=new THREE.Group();scene.add(plane);
 let craft=null,surf=null,propHub=null,propDisc=null,loadedId=null;
 function disposeTree(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();m.dispose();});}});}
-function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
+function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=AIRCRAFT[id].kind==='quad'?buildQuad(AIRCRAFT[id],paintOf(id)):buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);if(typeof applyStabLabel==='function')applyStabLabel();plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
 function animateSurfaces(IN){animateCraft(craft,IN,st.gearPos);}
 loadPlayerAircraft(career.selected);

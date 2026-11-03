@@ -63,7 +63,7 @@ function setSticks(on){settings.sticks=on;document.body.classList.toggle('touch'
 
 /* flight controller mixer (like a trainer receiver gyro): Off / Assist (rate damping) / Self-level (attitude hold, 45° bank limit) */
 function stabMix(a,e,r){
-  const mode=G.stab; if(mode===0||!st.airborne||st.onGround)return [a,e,r];
+  const mode=G.stab; if(AC.kind==='quad'||mode===0||!st.airborne||st.onGround)return [a,e,r];
   const p=-st.w.z, q=st.w.x, yaw=-st.w.y;
   if(mode===1){return [clamp(a-0.06*p,-1,1),clamp(e-0.05*q,-1,1),clamp(r-0.04*yaw,-1,1)];}
   const att=attitude();const roll=-att.roll, pitch=att.pitch; // attitude().roll is +left-wing-down (ADI convention); controls use +right
@@ -102,6 +102,7 @@ function readInput(){
   IN.thr=G.cut?0:clamp(t,0,1);IN.src=src;
   IN.flap=AC.features.flaps?[0,0.26,0.61][G.flapPos]:0;
   IN.gear=AC.features.gear&&G.gearUp?1:0;
+  IN.mode=G.stab;IN.arm=!G.cut; // quads: the stabiliser button picks the flight-controller mode
 }
 
 /* gear and flap toggles for keyboard and touch; a mapped transmitter switch overrides them on the next frame */

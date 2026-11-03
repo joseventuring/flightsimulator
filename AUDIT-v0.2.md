@@ -97,3 +97,19 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Career balance: Wardens fly at least 90% of your aircraft's top speed, so the jet still has to out-turn them.
 - Tests: new test/fleet.test.js loads the shipped catalogue into the shipped physics (rest, taxi, takeoff, top speed, hands-off, roll, power-off landing) for all six aircraft: all pass. Browser: hangar previews, keyboard takeoffs, flap and gear toggles.
 - Next: Sprint Q-16 needs a multirotor physics module (acro rate mode); then Hoverwing V-14 (VTOL transition), then Rotor R-20 (collective pitch helicopter).
+
+## v0.9 (4 Nov 2026): Sprint Q-16, multirotor physics and flight controller
+
+- New physics module for multirotors (sim.js stepQuad), separate from the fixed-wing model and shared by future quads (Halo, Surveyor, Hauler):
+  - four motors in an X with first-order spin-up (30 ms), thrust falling with inflow through the disc, ground effect, prop drag torque for yaw;
+  - rotor drag that grows with thrust, body drag per axis, wind through relative airspeed;
+  - 6S pack with load sag (5 mOhm per cell; 12 mOhm first, which collapsed the voltage under 120 A and was corrected);
+  - ground contact points with friction; a hard hit (over 4.5 m/s down or 9 m/s sideways) or a turtle (upside down for more than 1.2 s) ends the flight.
+- Flight controller, Betaflight-style: rate PID with D on the gyro, a mixer that shifts rather than clips (airmode), three modes on the stabiliser button: Acro (default), Horizon, Angle (55 deg limit). D-term added after the P-only loop overshot 720 deg/s by 15%; tuned to kP 60, kI 15, kD 1.2: 725 deg/s peak, 67 ms to 90%, stops dead.
+- Sprint Q-16: 650 g, 6S 1100, 1750 KV, 5 inch triblades, thrust/weight 8.5. Measured: hover 27% throttle, holds 10 m with no drift, roll and pitch 725 deg/s, yaw 461 deg/s, full authority at zero throttle (airmode), level top speed 121 km/h (hangar shows 130), gentle landing at 0.7 m/s sink, hover endurance 8.6 min. 3500 cr.
+- Model: carbon X frame, stack, battery on top, 25 deg camera, 2306 motors, triblade props that blur per motor speed.
+- Cameras: FPV view from the quad's camera with 25 deg uptilt and a 92 deg lens; chase camera follows heading, not attitude, so flips do not spin the view; hangar orbit sized for the quad.
+- Phone hangar: panel docks right at 60% width so the aircraft stays visible.
+- Bug found in the browser test: with the quad saved as the selected aircraft, start-up hit a label constant before it was defined and the hangar would not open. Fixed.
+- Tests: test/quad.test.js (rest, hover, roll, pitch, yaw, airmode, angle limit, top speed, landing, drop, turtle, endurance), all pass; npm test runs it with the fleet test.
+- Next: Hoverwing V-14 (VTOL: quad lift plus a cruise motor and a wing, with transition), then Rotor R-20.

@@ -1,7 +1,7 @@
 {
   "name": "flightsimulator",
   "productName": "JG Flight Sim",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Jinu's Garage RC flight simulator: CraycleCub V2 on the Kurianad field, FlySky sim-cable ready.",
   "main": "electron/main.js",
   "author": "Jinu's Garage",
@@ -10,22 +10,65 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --publish never",
-    "release": "electron-builder --publish always"
+    "release": "electron-builder --publish always",
+    "build": "python3 build.py",
+    "test": "node test/physics.test.js all"
   },
   "devDependencies": {
     "electron": "33.2.0",
-    "electron-builder": "25.1.8"
+    "electron-builder": "25.1.8",
+    "three": "0.128.0"
   },
   "build": {
     "appId": "in.jinujose.garage.flightsim",
     "productName": "JG Flight Sim",
     "artifactName": "JG-Flight-Sim-${version}-${os}-${arch}.${ext}",
-    "files": ["index.html", "electron/**", "icons/**"],
-    "directories": { "output": "dist" },
-    "mac": { "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }], "category": "public.app-category.games", "icon": "icons/icon.png" },
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "icons/icon.png" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "linux": { "target": ["AppImage", "deb"], "category": "Game", "icon": "icons/icon.png" },
-    "publish": { "provider": "github" }
+    "files": [
+      "index.html",
+      "electron/**",
+      "icons/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.games",
+      "icon": "icons/icon.png"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icons/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game",
+      "icon": "icons/icon.png"
+    },
+    "publish": {
+      "provider": "github"
+    }
   }
 }

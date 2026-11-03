@@ -41,6 +41,14 @@ Mac builds are unsigned, so the first launch needs right-click, Open. Signing co
 
 Lift, drag and thrust act on a point mass; pitch, roll and yaw moments act on body inertias. Control authority scales with airspeed and prop wash. Stall starts at 15 degrees of angle of attack. The numbers live in the `AC` object at the top of the script and were tuned so takeoff, climb, loop, glide and stall behave like a light foam trainer. Rates and expo are user settings, like on the FS-i6.
 
+## Real aircraft mesh (optional)
+
+Export the CraycleCub V2 as `assets/craycle-cub.glb` (Blender: import the STLs, scale to metres with the nose on -Z and the wing along X, name the moving parts `ailL`, `ailR`, `elev`, `rudd`, File > Export > glTF 2.0, binary). Drop it in `assets/` and the sim replaces the box model at load; the control surfaces animate if the names match. Validate with `npx @gltf-transform/cli validate assets/craycle-cub.glb`.
+
+## Game-dev skills applied (v0.3)
+
+From gamedev-skills/awesome-gamedev-agent-skills, routed for three.js: physics-tuning (clamped fixed-step dt, pause on hidden tab), game-feel (tiered feedback: dust, flash, trauma shake, gate pulse, reduced-motion respected), camera-systems (ground-clamped chase with look-ahead, additive shake), input-systems (radial deadzone, dual-rates switch, pause keys), audio-design (motor, wind and alert buses under a squared master slider), game-ui-ux (screen stack with Pause, initial focus per card), performance-optimization (adaptive pixel ratio from measured frame time), save-systems (versioned, validated localStorage), threejs-materials-lighting (PBR plane, ACES tone mapping, sky dome), threejs-gltf-loading (optional real mesh).
+
 ## Roadmap
 
 1. Freefly and gates (this release)

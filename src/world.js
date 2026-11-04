@@ -17,7 +17,7 @@ function updateWind(dt){
   const f=clamp(Math.log(h/0.03)/Math.log(10/0.03),0.2,1.15);
   wind.vec.set((wind.mean.x+wind.gx)*f,wind.gy*f,(wind.mean.z+wind.gz)*f);
 }
-const env={wind:wind.vec,rho:1.18,ground:(x,z)=>terrainH(x,z),surfaceAt:(x,z)=>(Math.abs(x)<3.5&&z<20&&z>-70)?'strip':'grass'};
+const env={wind:wind.vec,rho:1.18,ground:(x,z)=>groundH(x,z),surfaceAt:(x,z)=>(Math.abs(x)<3.5&&z<20&&z>-70)?'strip':'grass'};
 
 /* ---------- field marshal ---------- */
 const MSG=[];const cool={};

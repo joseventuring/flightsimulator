@@ -7,7 +7,17 @@ function drawADI(a){const W=110,H=110,cx=55,cy=55;adi.clearRect(0,0,W,H);adi.sav
   adi.save();adi.translate(cx,cy);adi.rotate(a.roll);adi.fillStyle='#F26522';adi.beginPath();adi.moveTo(0,-48);adi.lineTo(-4,-41);adi.lineTo(4,-41);adi.fill();adi.restore();
   adi.strokeStyle='#A3AEBA';adi.lineWidth=1;[-60,-30,-20,-10,10,20,30,60].forEach(d=>{const r=d*Math.PI/180;adi.beginPath();adi.moveTo(cx+Math.sin(r)*47,cy-Math.cos(r)*47);adi.lineTo(cx+Math.sin(r)*(Math.abs(d)%30===0?41:44),cy-Math.cos(r)*(Math.abs(d)%30===0?41:44));adi.stroke();});
   adi.beginPath();adi.arc(cx,cy,50,0,Math.PI*2);adi.stroke();}
+/* the real roads, water and roofs round the field, drawn once at 1 px per metre for the map inset */
+const MINI=(()=>{if(typeof FEAT==='undefined'||!FEAT)return null;const R=460,c=document.createElement('canvas');c.width=c.height=R*2;const g=c.getContext('2d');g.translate(R,R);g.lineCap=g.lineJoin='round';
+  const poly=(p,close)=>{g.beginPath();g.moveTo(p[0],p[1]);for(let j=2;j<p.length;j+=2)g.lineTo(p[j],p[j+1]);if(close)g.closePath();};
+  g.fillStyle='rgba(80,140,170,.55)';FEAT.wp.forEach(l=>{poly(l.p,true);g.fill();});
+  g.strokeStyle='rgba(80,140,170,.6)';FEAT.wl.forEach(l=>{g.lineWidth=Math.max(2,WL_W[l.c]);poly(l.p);g.stroke();});
+  g.strokeStyle='rgba(205,200,190,.55)';FEAT.roads.forEach(l=>{g.lineWidth=Math.max(2.5,ROAD_W[l.c]*0.8);poly(l.p);g.stroke();});
+  g.fillStyle='rgba(230,214,190,.42)';if(FEAT.blds)FEAT.blds.forEach(b=>{if(Math.abs(b.x)>R||Math.abs(b.z)>R)return;g.save();g.translate(b.x,b.z);g.rotate(b.a);g.fillRect(-b.l/2,-b.w/2,b.l,b.w);g.restore();});
+  return {c,R};})();
 function drawMap(a){const W=130,H=110,cx=65,cy=60;mapc.clearRect(0,0,W,H);const d=Math.hypot(st.pos.x-2.5,st.pos.z-4.5);const scale=Math.max(0.38,Math.min(1.2,45/Math.max(d,40)));const X=x=>cx+x*scale, Y=z=>cy+z*scale*0.85-10;
+  if(MINI){mapc.save();mapc.setTransform(scale,0,0,scale*0.85,cx,cy-10);mapc.drawImage(MINI.c,-MINI.R,-MINI.R);mapc.restore();}
+  if(MAP.home){mapc.fillStyle='#F5C542';mapc.beginPath();mapc.arc(X(MAP.home[0]),Y(MAP.home[1]),3,0,Math.PI*2);mapc.fill();}
   mapc.fillStyle='rgba(242,101,34,.14)';mapc.fillRect(X(6),Y(-2),26*scale,24*scale*0.85);
   mapc.fillStyle='rgba(242,101,34,.08)';mapc.fillRect(X(-80),Y(2),160*scale,60*scale*0.85);
   mapc.fillStyle='#8a7a5e';mapc.fillRect(X(-3.5),Y(-70),7*scale,90*scale*0.85);

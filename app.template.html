@@ -345,7 +345,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.12</div>
+        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.13</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -580,9 +580,9 @@ function frame(now){
     acc+=dt;let n=0,crash=null;
     while(acc>=DT&&n<12){crash=Sim.step(st,IN,DT,env);acc-=DT;n++;if(crash)break;}
     if(!crash){
-      for(const t of trees){const dx=st.pos.x-t.x,dz=st.pos.z-t.z;if(st.pos.y<t.h&&dx*dx+dz*dz<(t.r*0.8)*(t.r*0.8)){crash='Flew into a tree.';break;}}
+      {const w=hitObstacle(st.pos);if(w)crash=w;}
       if(Math.abs(st.pos.x-18)<5.4&&Math.abs(st.pos.z-10)<4.4&&st.pos.y<4.5)crash='Flew into the hangar.';
-      if(!crash&&st.pos.y<terrainH(st.pos.x,st.pos.z)+0.1&&terrainH(st.pos.x,st.pos.z)>0.3)crash='Flew into the hillside.';
+      if(!crash){const gh=groundH(st.pos.x,st.pos.z);if(st.pos.y<gh+0.1&&gh>0.3)crash='Flew into the hillside.';}
       if(st.pos.y>700||Math.abs(st.pos.x)>1100||Math.abs(st.pos.z)>1100)crash='Flew out of the field.';
     }
     if(st.airborne&&!G.flightStart){G.flightStart=st.time;say('Airborne. Climb straight ahead to 30 m before the first turn.','good');}
@@ -605,7 +605,7 @@ function frame(now){
   updateMulti(dt);updateCamera(dt);updateMarker();updateHUD(dt);drawPursuitHud();updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={plane,THREE,AIRCRAFT,statsOf,MP,mpJoin,mpLeave,get craft(){return craft},get loadedId(){return loadedId},get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+window.JG={plane,THREE,MAP_ID,MAP,FEAT,GND,OBST,trees,groundH,hitObstacle,AIRCRAFT,statsOf,MP,mpJoin,mpLeave,get craft(){return craft},get loadedId(){return loadedId},get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
 showPad();show('menuCard');
 requestAnimationFrame(frame);
 })();

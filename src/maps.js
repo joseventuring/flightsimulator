@@ -57,3 +57,15 @@ const MAP=(()=>{const D=MAP_DATA[MAP_ID];const n=D.n;const bin=atob(D.h);const H
 function demH(x,z){const n=MAP.n,s=MAP.size;let fi=(x+s/2)/s*(n-1),fj=(z+s/2)/s*(n-1);fi=Math.max(0,Math.min(n-1.001,fi));fj=Math.max(0,Math.min(n-1.001,fj));
   const i=fi|0,j=fj|0,u=fi-i,v=fj-j,H=MAP.H;return H[j*n+i]*(1-u)*(1-v)+H[j*n+i+1]*u*(1-v)+H[(j+1)*n+i]*(1-u)*v+H[(j+1)*n+i+1]*u*v;}
 function waterCell(x,z){const n=MAP.n,s=MAP.size;const i=Math.round((x+s/2)/s*(n-1)),j=Math.round((z+s/2)/s*(n-1));if(i<0||j<0||i>=n||j>=n)return -1;return MAP.W[j*n+i]?j*n+i:-1;}
+/* ---------- real ground features (tools/build_features.py): buildings, roads, rivers, ponds, land cover ----------
+   (c) OpenStreetMap contributors, Overture Maps Foundation (incl. Microsoft and Google Open Buildings), ESA WorldCover 2021 */
+const FEAT=(()=>{const F=(typeof MAP_FEAT!=='undefined')?MAP_FEAT[MAP_ID]:null;if(!F)return null;
+  const b64=s=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;};
+  const lines=s=>{const u=b64(s),dv=new DataView(u.buffer);const out=[];let o=0;while(o+3<=u.length){const c=u[o],m=dv.getUint16(o+1,true);o+=3;const p=new Float32Array(m*2);
+    for(let j=0;j<m;j++){p[j*2]=dv.getInt16(o,true)/2;p[j*2+1]=dv.getInt16(o+2,true)/2;o+=4;}out.push({c,p});}return out;};
+  const bu=b64(F.b),bv=new DataView(bu.buffer),nb=(bu.length/10)|0,B=new Float32Array(nb*8);
+  for(let i=0;i<nb;i++){const o=i*10;B[i*8]=bv.getInt16(o,true)/2;B[i*8+1]=bv.getInt16(o+2,true)/2;B[i*8+2]=bu[o+4]/2;B[i*8+3]=bu[o+5]/2;B[i*8+4]=bu[o+6]/256*Math.PI;B[i*8+5]=bu[o+7]/2;B[i*8+6]=bu[o+8];B[i*8+7]=bu[o+9];}
+  const g=F.lc.g,lc=new Uint8Array(g*g),r=b64(F.lc.rle);let k=0;for(let o=0;o+1<r.length&&k<g*g;o+=2){lc.fill(r[o],k,k+r[o+1]);k+=r[o+1];}
+  return {B,nb,roads:lines(F.r),wl:lines(F.wl),wp:lines(F.wp),lcG:g,lc,src:F.src};})();
+/* land cover code at a point: 1 trees, 2 shrub, 3 grass, 4 crop (paddy), 5 built-up, 6 bare, 8 water, 9 wetland, 10 mangrove; 0 unknown */
+function lcAt(x,z){if(!FEAT)return 0;const g=FEAT.lcG,s=MAP.size;const i=Math.floor((x+s/2)/s*g),j=Math.floor((z+s/2)/s*g);if(i<0||j<0||i>=g||j>=g)return 0;return FEAT.lc[j*g+i];}

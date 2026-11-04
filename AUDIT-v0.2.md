@@ -151,3 +151,33 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Airspace: Drone Rules 2021 bands against estimated airport perimeters (OurAirports runways plus a land buffer), police no-fly circles, and a 1 km safety margin on the 12 km line. Kurianad green 120 m (Kochi naval air station 36 km, Cochin International 44 km); Moinabad green 120 m (RGIA 16 km, Begumpet 21 km). Shown in Field and feel and enforced by the marshal.
 - Visuals: Kerala greens and a dry Deccan palette, baked hillshade, two-scale ground shading (no tiling grid), 4 to 5 km visibility, logarithmic depth (no field flicker), denser Kerala tree cover, Deccan granite boulders, neem and toddy palms.
 - Multiplayer rooms are per map.
+
+## v0.13 (4 Nov 2026): real ground features on the maps
+
+Feedback: the maps did not look like the real places. v0.12 had real hill shapes only, with invented trees and no roads or buildings.
+
+What changed
+- Real buildings, roads, rivers, canals, ponds and lakes from Overture Maps (release 2026-10-21.0: OpenStreetMap, Microsoft and Google Open Buildings footprints), and real land cover from ESA WorldCover 2021 (10 m). Built by `tools/build_features.py` and packed into small binary arrays (Kurianad 215 KB, Moinabad 393 KB).
+  - Kurianad: 11,053 buildings, 273 km of road, 131 streams and canals, 50 ponds. Land cover is 98% tree cover, which matches the rubber and homestead midlands.
+  - Moinabad: 10,183 buildings, 632 km of road (lanes and tracks within 5 km), Osman Sagar and the tanks taken from their real shorelines.
+- The field is on real clear ground. `tools/build_map.py --clear` rejects any site where a real building, road or water body touches the 150 x 210 m field, and penalises tree, built-up and water land cover. Both v0.12 fields had houses or lanes on them (17 buildings at Kurianad; 4 buildings and 3 lanes at Moinabad), so both fields moved:
+  - Kurianad: 9.78264, 76.56343.
+  - Moinabad: 17.34518, 78.28153.
+- Lakes come from the real water polygons (over 2 ha), with their levels taken from the elevation data.
+- Levelling: about 170 m around the field, blending into the terrain by 400 m (it was 250 m and 520 m).
+- Rendering:
+  - Ground colour follows the real land cover.
+  - Roads and rivers are ribbons draped on the drawn surface.
+  - Buildings are oriented blocks with windows drawn in the shader, Kerala tiled roofs, and flat concrete terraces.
+  - Canopy follows the land cover. Palms stand round Kerala homes. Nothing is planted on a road, roof or pond.
+  - The inset map shows the real roads, water and roofs.
+- One ground surface everywhere: `groundH()` is the exact height of the drawn mesh, and the physics, roads, buildings and trees all use it.
+- Crashes: buildings and trees go into a 20 m obstacle grid. "Flew into a building." is a new crash reason, and per-frame checks look at a few objects instead of thousands.
+- Colour fix: scene colours are converted from sRGB to linear. The pale, washed-out ground came from treating sRGB hex as linear light.
+- Performance:
+  - Instanced meshes are split into 900 m tiles with real bounding spheres, so off-screen tiles are culled. Before this, instanced meshes were culled by their template geometry at the origin.
+  - The box bottom faces are dropped.
+  - Building and canopy radius and counts are capped lower on phones.
+- Private build: `python3 build.py --private` adds `private/maps/*` (git-ignored) and writes `private/dist/index.html`. It is never published.
+
+Credits shown in the field card: OpenStreetMap contributors, Overture Maps Foundation, Microsoft and Google Open Buildings (ODbL), and ESA WorldCover 2021 (CC BY 4.0).

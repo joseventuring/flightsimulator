@@ -15,7 +15,7 @@ function save(){store.set('jgsim.log',logbook);}
 function saveSettings(){store.set('jgsim.settings',settings);}
 function haptic(ms){try{if(settings.haptics&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
 function reset(){
-  st=Sim.create();G.gearUp=false;G.flapPos=0;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
+  st=Sim.create();G.gearUp=false;G.flapPos=0;G.vtolPlane=false;vtolWatch.s=undefined;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
   MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
   gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
   gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
@@ -144,7 +144,7 @@ on('bHangarBack',back);
 on('bTxWizard',()=>startWizard(0));on('bTxBack',()=>{wiz.on=false;swCap=null;$('wiz').hidden=true;back();});
 on('bClear',startFlight);on('bSkipPre',startFlight);on('bPreTx',()=>openTx(false));on('bPreBack',back);
 on('bAgain',reset);on('bLandAgain',reset);on('bLandLog',showLog);on('bWinGo',hide);on('bWinAgain',reset);on('bCrashMenu',toMenu);on('bLandMenu',toMenu);
-onAll('[data-cam]',cycleCam);onAll('[data-gear]',toggleGear);onAll('[data-flap]',cycleFlaps);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
+onAll('[data-cam]',cycleCam);onAll('[data-gear]',toggleGear);onAll('[data-vtol]',toggleVtol);onAll('[data-flap]',cycleFlaps);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
 onAll('[data-sound]',()=>{if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();G.sound=!G.sound;document.querySelectorAll('[data-sound]').forEach(b=>b.textContent='Sound '+(G.sound?'on':'off'));});
 on('bPause',togglePause);on('bPauseM',togglePause);on('bResume',togglePause);
 on('bPauseTx',()=>openTx(false));on('bPauseLog',showLog);on('bPauseReset',reset);on('bPauseMenu',toMenu);on('bPauseField',()=>show('fieldCard'));

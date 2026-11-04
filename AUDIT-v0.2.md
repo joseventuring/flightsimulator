@@ -113,3 +113,17 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Bug found in the browser test: with the quad saved as the selected aircraft, start-up hit a label constant before it was defined and the hangar would not open. Fixed.
 - Tests: test/quad.test.js (rest, hover, roll, pitch, yaw, airmode, angle limit, top speed, landing, drop, turtle, endurance), all pass; npm test runs it with the fleet test.
 - Next: Hoverwing V-14 (VTOL: quad lift plus a cruise motor and a wing, with transition), then Rotor R-20.
+
+## v0.10 (4 Nov 2026): Hoverwing V-14 QuadPlane VTOL
+
+- QuadPlane physics (ArduPilot style) layered on the fixed-wing model: four lift motors on booms (lag, inflow loss, prop yaw torque), Angle-mode attitude hold shared with the quad, rate PID with D on the gyro, a mixer that shifts rather than clips.
+- Modes on a switch (V key, on-screen button, or a mapped transmitter switch "VTOL mode"):
+  - Hover: lift motors fly it, throttle is lift, cruise motor off.
+  - Plane: cruise motor on the throttle; lift motors hold height and attitude while airspeed builds, fading out by the transition speed (45 km/h), then stop.
+  - Back to Hover: automatic nose-up braking at about 1.6 m/s^2, then the pilot has it.
+- Hoverwing V-14: 1.6 m, 2.4 kg, 6S 6000, lift thrust 58 N, cruise 18 N. Measured: hover 57% throttle at 39 A (about 7 min), transition 2.8 s losing 1.7 m, cruise 67 km/h at 17.5 A (over 20 min), back-transition stop from 67 km/h in 12 s holding height within 0.2 m, vertical landing 0.35 to 0.65 m/s sink. 5000 cr.
+- Model: carbon booms, four lift motors with two-blade props blurring per motor, cruise prop on the nose. Sound follows lift or cruise power, whichever is higher.
+- Field marshal: no stall call while the lift motors carry the aircraft; transition, wing-borne and back-transition announcements.
+- Battery: false "Land now" alarms found on fresh 6S packs. Pack resistance now per aircraft (6S 6000: 3 mOhm, 6S 3300: 4 mOhm); quad alarm at 3.4 V per cell, as FPV pilots set it, because a 6S racing pack sags to about 3.5 V on a full punch. New test/battery.test.js checks every aircraft at full power on a fresh pack.
+- Tests: test/vtol.test.js (rest, vertical take-off and hover, transition, cruise, back-transition, vertical landing, hover current); npm test runs fleet, quad, VTOL and battery tests; browser regressions pass.
+- Next: Rotor R-20, collective-pitch helicopter (the hardest flight model: rotor head, tail rotor, governor, autorotation).

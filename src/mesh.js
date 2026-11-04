@@ -102,7 +102,18 @@ function buildAircraft(spec,paint,wheels){
     rodTo(holder,new THREE.Vector3(0,0,0),hub.position.clone(),main?0.0028*Math.max(1,k*0.8):0.002*Math.max(1,k*0.8),matMetal);
     if(main&&!G0.edf)rodTo(holder,new THREE.Vector3(0,0.005,0.05),hub.position.clone(),0.0024,matMetal);
     legs.push({g:leg,main,side:Math.sign(W.p.x)||1,sgn:Math.sign(W.steer||1)});});
-  return {root,propHub,propDisc,steer,legs,retracts:!!(spec.phys&&spec.phys.features&&spec.phys.features.gear),surf:{ailL:wL.hinge,ailR:wR.hinge,elev,rudd:rud,flapL:wL.flap,flapR:wR.flap}};}
+  /* QuadPlane: two carbon booms under the wing, four lift motors with 10 inch two-blade props */
+  let liftProps=null;if(G0.vtol){const L=G0.vtol,carbon=new THREE.MeshStandardMaterial({color:0x17191c,roughness:0.45,metalness:0.25});liftProps=[];
+    [-1,1].forEach(sx=>{const bm=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,2*L.z+0.08,10),carbon));bm.rotation.x=Math.PI/2;bm.position.set(sx*L.x,G0.wingY-0.012,0);root.add(bm);});
+    const bladeS=new THREE.Shape();bladeS.moveTo(0,-0.006);bladeS.quadraticCurveTo(L.R*0.45,-0.014,L.R,-0.005);bladeS.quadraticCurveTo(L.R*1.03,0,L.R,0.004);bladeS.quadraticCurveTo(L.R*0.5,0.01,0,0.006);
+    const bladeG=new THREE.ShapeGeometry(bladeS);bladeG.rotateX(-Math.PI/2);
+    [[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]].forEach(([sx,sz,dir])=>{const x=sx*L.x,z=sz*L.z;
+      const mt=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.026,16),matMetal));mt.position.set(x,L.y-0.02,z);root.add(mt);
+      const pg=new THREE.Group();pg.position.set(x,L.y,z);root.add(pg);const bmat=new THREE.MeshStandardMaterial({color:0x111214,roughness:0.5,side:THREE.DoubleSide});const blades=[];
+      for(let k=0;k<2;k++){const b=new THREE.Mesh(bladeG,bmat);b.rotation.y=k*Math.PI;b.rotation.z=dir*0.1;pg.add(b);blades.push(b);}
+      const disc=new THREE.Mesh(new THREE.CircleGeometry(L.R,32),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.rotation.x=-Math.PI/2;pg.add(disc);
+      liftProps.push({g:pg,dir,blades,disc});});}
+  return {root,propHub,propDisc,steer,legs,liftProps,retracts:!!(spec.phys&&spec.phys.features&&spec.phys.features.gear),surf:{ailL:wL.hinge,ailR:wR.hinge,elev,rudd:rud,flapL:wL.flap,flapR:wR.flap}};}
 
 /* ---------- 5 inch FPV quad: carbon X frame, stack, battery on top, tilted camera, 2306 motors, triblade props ---------- */
 function buildQuad(spec,paint){const g=spec.geom,a=g.arm,R=g.propR,root=new THREE.Group();
@@ -137,8 +148,10 @@ function buildQuad(spec,paint){const g=spec.geom,a=g.arm,R=g.propR,root=new THRE
   return {root,propHub,propDisc,steer:dummy(),legs:[],retracts:false,props,surf:{ailL:dummy(),ailR:dummy(),elev:dummy(),rudd:dummy(),flapL:dummy(),flapR:dummy()}};}
 const THROW={ail:0.45,ele:0.38,rud:0.5};
 function animateCraft(c,inp,gp){
-  if(c.props){/* props spin with each motor's own speed; past a third of full speed the blades blur into a disc */
-    c.props.forEach((P,i)=>{const m=(typeof st!=='undefined'&&st.motor)?st.motor[i]:0;P.g.rotation.y+=P.dir*(m*4.2+(m>0.01?0.6:0));P.blades.forEach(b=>b.visible=m<0.35);P.disc.material.opacity=clamp((m-0.2)*0.9,0,0.38);});return;}c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
+  const spinProps=list=>list.forEach((P,i)=>{const m=(typeof st!=='undefined'&&st.motor)?st.motor[i]:0;P.g.rotation.y+=P.dir*(m*4.2+(m>0.01?0.6:0));P.blades.forEach(b=>b.visible=m<0.35);P.disc.material.opacity=clamp((m-0.2)*0.9,0,0.38);});
+  /* props spin with each motor's own speed; past a third of full speed the blades blur into a disc */
+  if(c.props){spinProps(c.props);return;}
+  if(c.liftProps)spinProps(c.liftProps);c.surf.ailL.rotation.x=inp.ail*THROW.ail;c.surf.ailR.rotation.x=-inp.ail*THROW.ail;c.surf.elev.rotation.x=-inp.ele*THROW.ele;c.surf.rudd.rotation.y=inp.rud*THROW.rud;c.surf.flapL.rotation.x=c.surf.flapR.rotation.x=inp.flap||0;
   /* the steerable wheel turns through the same angle the physics uses: tailwheels follow the rudder, nosewheels turn against it */
   const sw=(c.legs&&c.legs[2])?c.legs[2].sgn:1;c.steer.rotation.y=sw*inp.rud*0.35;
   if(c.retracts){gp=gp||0;c.legs.forEach(L=>{if(L.main)L.g.rotation.z=-L.side*gp*1.5;else L.g.rotation.x=-gp*1.55;L.g.visible=gp<0.97;});}}

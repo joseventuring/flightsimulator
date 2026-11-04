@@ -28,7 +28,7 @@ function thrustFactor(P,u){if(P.edf){const x=Math.max(u,0)/P.Vpitch,s=Math.sqrt(
 function create(){
   return {pos:new V3(0,AC.spawnY||0.11,0),gearPos:0,vel:new V3(),q:new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),AC.spawnPitch===undefined?0.15:AC.spawnPitch),w:new V3(),
     thr:0,T:0,time:0,usedAh:0,volt:AC.cells*4.2,amp:0,soc:1,onGround:true,airborne:false,alpha:0,beta:0,V:0,nz:1,stall:0,
-    touchdown:null,maxV:0,maxAlt:0,mT:[0,0,0,0],iw:new V3(),air:false,turtleT:0,motor:[0,0,0,0],wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
+    touchdown:null,maxV:0,maxAlt:0,trans:0,liftAuth:0,liftT:0,lift:0,mT:[0,0,0,0],iw:new V3(),air:false,turtleT:0,motor:[0,0,0,0],wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
 }
 // scratch
 const _qi=new THREE.Quaternion(),_va=new V3(),_vb=new V3(),_F=new V3(),_tq=new V3(),_pw=new V3(),_ww=new V3(),_rw=new V3(),_vw=new V3(),
@@ -46,7 +46,8 @@ function step(st,inp,dt,env){
   const p=-st.w.z, q=st.w.x, r=-st.w.y;
   // motor and battery
   const battF=Math.pow(st.volt/(AC.cells*4.2),2);
-  st.thr+=(inp.thr-st.thr)*(1-Math.exp(-dt/AC.spool));
+  const thrC=AC.kind==='vtol'&&!inp.vtol?0:inp.thr; // QuadPlane: the cruise motor only runs in plane mode
+  st.thr+=(thrC-st.thr)*(1-Math.exp(-dt/AC.spool));
   let T=AC.Tmax*st.thr*battF*thrustFactor(AC,u);
   if(st.thr<0.02)T=0;
   st.T=T;
@@ -108,6 +109,7 @@ function step(st,inp,dt,env){
   _F.y-=AC.mass*AC.g;
   _tq.set(Mm,-Nm,-Lm);
   st.nz=(-FZ)/(AC.mass*AC.g);
+  if(AC.kind==='vtol')vtolLift(st,inp,dt,V,rho);
   // wheels
   let contact=false, maxN=0, crash=null, hit=0;
   for(let i=0;i<3;i++){
@@ -167,6 +169,48 @@ function step(st,inp,dt,env){
    2 Angle (sticks command a tilt angle, the craft levels itself). Airmode keeps full authority at zero throttle once armed. */
 const _mq=[new V3(),new V3(),new V3(),new V3()],_u=new V3(),_d=new V3(),_f=new V3(),_r=new V3(),_e=new V3(),_wd=new V3(),_cp=new V3(),_cv=new V3(),_fb=new V3();
 const MOT=[[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]]; // [x sign, z sign, spin: +1 counter-clockwise from above]
+/* angle loop: tilt the body up-vector toward the one the sticks ask for; returns body pitch and roll rate commands */
+function angleCmd(st,ail,ele,maxDeg,kA,rateMax){_qi.copy(st.q).invert();
+  _u.set(0,1,0).applyQuaternion(st.q);_f.set(0,0,-1).applyQuaternion(st.q);_f.y=0;if(_f.lengthSq()<1e-4){_f.copy(_u).multiplyScalar(-1);_f.y=0;}_f.normalize();
+  _r.set(-_f.z,0,_f.x);const mA=maxDeg*Math.PI/180;
+  _d.set(0,1,0).addScaledVector(_r,Math.tan(ail*mA)).addScaledVector(_f,-Math.tan(ele*mA)).normalize();
+  _e.copy(_u).cross(_d);const sn=_e.length(),cs=_u.dot(_d);const ang=Math.atan2(sn,cs);if(sn>1e-6)_e.multiplyScalar(ang/sn);else if(cs<0)_e.set(0,0,Math.PI);
+  _e.applyQuaternion(_qi);const L=rateMax*0.0175;return [clamp(kA*_e.x,-L,L),clamp(kA*_e.z,-L,L)];}
+/* QuadPlane lift system (ArduPilot style). Hover mode: four lift motors fly it like a quad in Angle mode, throttle is lift.
+   Plane mode: the cruise motor takes the throttle; the lift motors hold height and attitude while airspeed builds
+   (transition), fading out as the wing takes over; once the transition completes they stop. Switching back to hover
+   re-engages them and the cruise motor stops. */
+const LIFT=[[-1,-1,-1],[1,-1,1],[-1,1,1],[1,1,-1]];
+function vtolLift(st,inp,dt,V,rho){const Tm=AC.liftTmax/4,J=[AC.Ipitch,AC.Iyaw,AC.Iroll],x0=AC.liftX,z0=AC.liftZ,y0=AC.liftY;
+  const plane=!!inp.vtol,armed=inp.arm!==false;let auth=0,col=0,stickK=1;const hov=Math.pow(AC.mass*AC.g/AC.liftTmax,1/AC.thrExp);
+  let brake=0;
+  if(!plane){/* back-transition: the controller pitches the nose up to shed speed (about 2 m/s^2, like ArduPilot Q_TRANS_DECEL), then hands back to the pilot */
+    _f.set(0,0,-1).applyQuaternion(st.q);_f.y=0;const uf=_f.lengthSq()>1e-4?st.vel.dot(_f.normalize()):0;
+    if(st.trans===1||st.trans===2)st.trans=uf>2?3:0;
+    if(st.trans===3){if(uf<1)st.trans=0;else brake=clamp(uf*1.6,0,20)/AC.maxAngle;}
+    auth=1;col=Tm*Math.pow(clamp(inp.thr,0,1),AC.thrExp);}
+  else{const u=V;if(st.trans!==2){st.trans=1;if(u>=AC.vTrans)st.trans=2;}
+    if(st.trans===1){auth=clamp((AC.vTrans-u)/(AC.vTrans*0.45),0,1);/* hold height while the wing is too slow */col=Tm*Math.pow(clamp(hov-0.18*st.vel.y,0,1),AC.thrExp)*auth;stickK=0.4;}}
+  if(!armed){auth=0;col=0;}
+  st.liftAuth=auth;
+  /* rate PID on top of the angle loop; yaw on the rudder stick */
+  let tx=0,ty=0,tz=0;
+  if(auth>0){const [wx,wz]=angleCmd(st,inp.ail*stickK,clamp(inp.ele*stickK+brake,-1,1),AC.maxAngle,AC.kAngle,AC.rateMax);const wy=-inp.rud*AC.yawMax*0.0175;
+    const ex=wx-st.w.x,ey=wy-st.w.y,ez=wz-st.w.z;if(!st.onGround){st.iw.x=clamp(st.iw.x+ex*dt,-0.5,0.5);st.iw.y=clamp(st.iw.y+ey*dt,-0.5,0.5);st.iw.z=clamp(st.iw.z+ez*dt,-0.5,0.5);}else st.iw.multiplyScalar(0.9);
+    if(!st.pw)st.pw=st.w.clone();const dx=(st.w.x-st.pw.x)/dt,dz=(st.w.z-st.pw.z)/dt;
+    tx=J[0]*(AC.kP*ex+AC.kI*st.iw.x-AC.kD*dx);ty=J[1]*(AC.kPy*ey+AC.kI*st.iw.y);tz=J[2]*(AC.kP*ez+AC.kI*st.iw.z-AC.kD*dz);}
+  st.pw=st.pw||st.w.clone();st.pw.copy(st.w);
+  const c=[0,0,0,0],on=auth>0&&(col>0.02*Tm||!st.onGround);
+  for(let i=0;i<4;i++){const [sx,sz,dir]=LIFT[i];c[i]=on?col+auth*(tx*(-sz*z0)/(4*z0*z0)+tz*(sx*x0)/(4*x0*x0)+ty*(-dir)/(4*AC.kQ)):0;}
+  if(on){let lo=Math.min(...c),hi=Math.max(...c);const room=Tm;if(hi-lo>room){const mid=(hi+lo)/2,k=room/(hi-lo);for(let i=0;i<4;i++)c[i]=mid+(c[i]-mid)*k;lo=Math.min(...c);}
+    if(lo<0){for(let i=0;i<4;i++)c[i]-=lo;}hi=Math.max(...c);if(hi>Tm){for(let i=0;i<4;i++)c[i]-=hi-Tm;}for(let i=0;i<4;i++)c[i]=clamp(c[i],0,Tm);}
+  _qi.copy(st.q).invert();_vb.copy(st.vel).applyQuaternion(_qi);const inflow=clamp(1-_vb.y/AC.liftVpitch,0,1.15),battF=Math.pow(st.volt/(AC.cells*4.2),2);
+  let Ts=0,Lx=0,Ly=0,Lz=0,pw=0;
+  for(let i=0;i<4;i++){st.mT[i]+=(c[i]-st.mT[i])*(1-Math.exp(-dt/AC.motorTau));const T=st.mT[i]*battF*inflow;const [sx,sz,dir]=LIFT[i];
+    Ts+=T;Lx+=-sz*z0*T;Lz+=sx*x0*T;Ly+=-dir*AC.kQ*T;st.motor[i]=Math.sqrt(st.mT[i]/Tm);pw+=Math.pow(st.mT[i]/Tm,1.5)/4;}
+  /* lift thrust acts along body up at the motor positions, slightly above the CG */
+  _fb.set(0,Ts,0).applyQuaternion(st.q);_F.add(_fb);_tq.x+=Lx;_tq.y+=Ly;_tq.z+=Lz;
+  const Il=AC.liftImax*pw;st.liftT=Ts;st.amp+=Il;st.lift=pw;st.usedAh+=Il*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);}
 function rateCurve(s,max){const a=Math.abs(s);return Math.sign(s)*(AC.rateC*a+(max-AC.rateC)*a*a*a)*Math.PI/180;}
 function stepQuad(st,inp,dt,env){
   st.time+=dt;const rho=env.rho||1.18,a=AC.arm,Tm=AC.Tmax/4,J=[AC.Ipitch,AC.Iyaw,AC.Iroll];
@@ -177,12 +221,7 @@ function stepQuad(st,inp,dt,env){
   const mode=inp.mode|0;
   const acroX=rateCurve(inp.ele,AC.rateMax),acroZ=-rateCurve(inp.ail,AC.rateMax),wy=-rateCurve(inp.rud,AC.yawMax);
   let wx=acroX,wz=acroZ;
-  if(mode>0){ // angle loop: tilt the body up-vector toward the one the sticks ask for
-    _u.set(0,1,0).applyQuaternion(st.q);_f.set(0,0,-1).applyQuaternion(st.q);_f.y=0;if(_f.lengthSq()<1e-4)_f.set(0,0,-1).applyQuaternion(st.q).setY(0).add(_u.clone().setY(0).multiplyScalar(-1));_f.normalize();
-    _r.set(-_f.z,0,_f.x);const mA=AC.maxAngle*Math.PI/180;
-    _d.set(0,1,0).addScaledVector(_r,Math.tan(inp.ail*mA)).addScaledVector(_f,-Math.tan(inp.ele*mA)).normalize();
-    _e.copy(_u).cross(_d);const sn=_e.length(),cs=_u.dot(_d);const ang=Math.atan2(sn,cs);if(sn>1e-6)_e.multiplyScalar(ang/sn);else if(cs<0)_e.set(0,0,Math.PI);
-    _e.applyQuaternion(_qi);const ax=clamp(AC.kAngle*_e.x,-AC.rateMax*0.0175,AC.rateMax*0.0175),az=clamp(AC.kAngle*_e.z,-AC.rateMax*0.0175,AC.rateMax*0.0175);
+  if(mode>0){const [ax,az]=angleCmd(st,inp.ail,inp.ele,AC.maxAngle,AC.kAngle,AC.rateMax);
     if(mode===2){wx=ax;wz=az;}else{const k=Math.min(1,Math.max(Math.abs(inp.ail),Math.abs(inp.ele)));const h=k*k;wx=ax*(1-h)+acroX*h;wz=az*(1-h)+acroZ*h;}
   }
   _wd.set(wx,wy,wz);

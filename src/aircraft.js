@@ -48,20 +48,29 @@ const AIRCRAFT={
     geom:{fus:JET_FUS,edf:true,cowl:3,k:1.33,wingY:-0.025,LE:-0.218,C:0.30,tip:0.68,taper:0.55,sweep:0.40,hinge:0.72,ail:[0.34,0.63],dih:0.02,flaps:true,struts:false,cabin:'bubble',stabZ:0.32,tail:1.25,spin:0.02,propR:0,gearTop:-0.035},
     phys:{name:'Comet J-09',mass:1.50,span:1.20,chord:0.239,S:0.279,AR:5.2,Tmax:21,Vpitch:55,edf:true,CD0:0.024,CL0:0.12,incidence:0.005,aStall:0.21,Cm0:-0.02,Clb:-0.02,Clda:0.06,Cm_a:-0.8,
       tailWash:0,finWash:0,kTorque:0.0004,kSwirl:0,spool:0.35,propD:0.07,gearCD:0.012,
-      Ipitch:0.06,Iroll:0.04,Iyaw:0.09,cells:6,capAh:3.3,Imax:65,KV:1950,blades:12,features:{flaps:true,gear:true},
+      Ipitch:0.06,Iroll:0.04,Iyaw:0.09,cells:6,capAh:3.3,Imax:65,KV:1950,rCell:0.004,blades:12,features:{flaps:true,gear:true},
       wheels:[{p:V(-0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0.15,-0.14,0.06),r:0.03,steer:0},{p:V(0,-0.145,-0.30),r:0.025,steer:-0.25}]},
     tail:[0.40,0.035],paint:{primary:'#F2EFE8',secondary:'#1B222B',accent:'#1F4E79'}},
+  hoverwing:{id:'hoverwing',name:'Hoverwing V-14',role:'VTOL',price:5000,blurb:'1.6 m QuadPlane: four lift motors on booms and a separate cruise prop. Takes off straight up in Hover mode, then flip to Plane mode and it transitions to wing-borne flight on its own. Flip back to Hover and it brakes itself to a stop so you can land on a spot. About 7 minutes hovering, over 20 in plane mode.',
+    geom:{fus:SPORT_FUS,cowl:3,k:1.5,wingY:0.055,LE:-0.10,C:0.27,tip:0.80,taper:0.75,ail:[0.45,0.76],dih:0.03,struts:false,cabin:'bubble',stabZ:0.30,tail:1.5,spin:0.03,propR:0.115,gearTop:-0.05,
+      vtol:{x:0.32,z:0.29,y:0.09,R:0.127}},
+    phys:{name:'Hoverwing V-14',kind:'vtol',mass:2.4,span:1.6,chord:0.236,S:0.38,AR:6.7,Tmax:18,Vpitch:32,CD0:0.048,CL0:0.25,Clb:-0.02,Clda:0.07,kTorque:0.004,kSwirl:0.004,propD:0.254,
+      Ipitch:0.13,Iroll:0.19,Iyaw:0.30,cells:6,capAh:6.0,Imax:35,KV:900,rCell:0.003,alarmV:3.5,
+      liftTmax:58,liftVpitch:30,liftX:0.32,liftZ:0.29,liftY:0.09,liftImax:150,thrExp:1.6,motorTau:0.06,kQ:0.016,maxAngle:30,kAngle:4,rateMax:180,yawMax:60,kP:10,kPy:6,kI:4,kD:0.15,vTrans:12.5,
+      features:{flaps:false,gear:false,vtol:true},
+      wheels:[{p:V(-0.15,-0.14,0.05),r:0.03,steer:0},{p:V(0.15,-0.14,0.05),r:0.03,steer:0},{p:V(0,-0.145,-0.36),r:0.025,steer:-0.25}]},
+    tail:[0.45,0.035],paint:{primary:'#F2EFE8',secondary:'#2F6B3A',accent:'#F26522'}},
   sprint:{id:'sprint',name:'Sprint Q-16',role:'FPV quad',kind:'quad',price:3500,blurb:'5 inch freestyle quad, 650 g on 6S, eight times more thrust than weight. Acro by default like a real FPV quad: the sticks set rotation rates and nothing levels it for you. Horizon and Angle are on the stabiliser button.',
     geom:{quad:true,k:1,arm:0.0795,propR:0.0635},
     phys:{name:'Sprint Q-16',kind:'quad',mass:0.65,span:0.225,arm:0.0795,Tmax:54,thrExp:1.6,Vpitch:48,motorTau:0.03,kQ:0.016,kH:0.006,CdA:[0.010,0.020,0.008],
       Ipitch:0.0016,Iroll:0.0013,Iyaw:0.0026,rateC:200,rateMax:720,yawMax:450,maxAngle:55,kAngle:7,kP:60,kPy:30,kI:15,kD:1.2,
-      cells:6,capAh:1.1,Imax:120,Iidle:0.6,rCell:0.005,KV:1750,blades:3,propD:0.127,kWheel:2500,cWheel:20,alarmV:3.5,spawnY:0.022,
+      cells:6,capAh:1.1,Imax:120,Iidle:0.6,rCell:0.005,KV:1750,blades:3,propD:0.127,kWheel:2500,cWheel:20,alarmV:3.4,spawnY:0.022,
       contacts:[{x:-0.0795,y:-0.02,z:-0.0795},{x:0.0795,y:-0.02,z:-0.0795},{x:-0.0795,y:-0.02,z:0.0795},{x:0.0795,y:-0.02,z:0.0795},{x:0,y:0.075,z:0},{x:0,y:0.0,z:-0.075},{x:0,y:0.0,z:0.08},
         {x:-0.0795,y:0.03,z:-0.0795},{x:0.0795,y:0.03,z:-0.0795},{x:-0.0795,y:0.03,z:0.0795},{x:0.0795,y:0.03,z:0.0795}],features:{flaps:false,gear:false}},
     paint:{primary:'#E8503A',secondary:'#1B222B',accent:'#F5C542'}},
 };
 /* gear springs scale with weight so every aircraft sits and rebounds like the 620 g Cub they were tuned on */
-['arrow','vortex','comet'].forEach(id=>{const A=AIRCRAFT[id],m=A.phys.mass/0.62;Object.assign(A.phys,tailFrom(A.geom,A.phys,A.tail[0],A.tail[1]),{crashPts:crashFrom(A.geom,A.geom.propR),kWheel:600*m,cWheel:12*Math.sqrt(m)});});
+['arrow','vortex','comet','hoverwing'].forEach(id=>{const A=AIRCRAFT[id],m=A.phys.mass/0.62;Object.assign(A.phys,tailFrom(A.geom,A.phys,A.tail[0],A.tail[1]),{crashPts:crashFrom(A.geom,A.geom.propR),kWheel:600*m,cWheel:12*Math.sqrt(m)});});
 const WARDEN={id:'warden',name:'Coast Warden',geom:Object.assign({},AIRCRAFT.kestrel.geom,{k:1.3,tip:0.5,decal:'WARDEN'}),paint:{primary:'#F2EFE8',secondary:'#16365C',accent:'#F26522'}};
 const UPGRADES={
   motor:[{name:'Stock',cost:0,T:1,I:1,Vp:1},{name:'Sport',cost:600,T:1.18,I:1.15,Vp:1.08},{name:'Race',cost:1500,T:1.35,I:1.32,Vp:1.15}],

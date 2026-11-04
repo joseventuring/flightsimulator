@@ -34,6 +34,6 @@ function marshal(){
   if(d>450)violation('Lost visual at '+Math.round(d)+' m. Bring it back inside 300 m.','los');
   else if(d>300)say('Losing visual at '+Math.round(d)+' m. Turn back.','warn','far',8);
   if(st.volt<AC.cells*AC.alarmV&&st.amp>3)say('Battery alarm, '+st.volt.toFixed(1)+' V. Land now.','bad','batt',12);
-  if(st.stall>0.5&&st.V>2&&!st.onGround)say('Stall.','warn','stall',4);
+  if(st.stall>0.5&&st.V>2&&!st.onGround&&!(st.liftAuth>0))say('Stall.','warn','stall',4);
 }
 

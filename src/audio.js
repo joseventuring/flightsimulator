@@ -26,13 +26,13 @@ function thud(k){if(G.sound)tone(70+40*k,0.25,'triangle',0.12*k);}
 const _ap=new THREE.Vector3(),_ar=new THREE.Vector3();
 function panFor(pos){_ap.copy(pos).sub(camera.position);const d=_ap.length();_ar.set(1,0,0).applyQuaternion(camera.quaternion);return {d,pan:d>0.01?clamp(_ap.dot(_ar)/d,-1,1)*0.8:0};}
 function updateAudio(dt){if(!audio)return;const on=G.sound&&!G.crashed&&!G.landed&&!G.paused&&G.view==='fly';const now=audio.ctx.currentTime;
-  const rpm=AC.KV*Math.max(st.volt,0)*st.thr*0.78;const rot=rpm/60;const edf=!!AC.edf;
+  const thrS=AC.kind==='vtol'?Math.max(st.thr,Math.sqrt(st.lift||0)):st.thr;const rpm=AC.KV*Math.max(st.volt,0)*thrS*0.78;const rot=rpm/60;const edf=!!AC.edf;
   /* a prop is heard at blade-pass (2 blades); a 12-blade fan's blade-pass is far up, so the ear gets the shaft tone, the whine and the rush */
   const bp=Math.max(edf?rot:rot*AC.blades,30);
   audio.blade.frequency.setTargetAtTime(bp,now,0.04);audio.sub.frequency.setTargetAtTime(bp*0.5,now,0.04);audio.whine.frequency.setTargetAtTime(Math.max(edf?rot*AC.blades:rot*7,60),now,0.04);
   audio.bladeG.gain.setTargetAtTime(edf?0.12:0.55,now,0.1);audio.subG.gain.setTargetAtTime(edf?0.05:0.22,now,0.1);audio.whineG.gain.setTargetAtTime(edf?0.05:0.07,now,0.1);
   audio.jet.gain.setTargetAtTime(edf?0.9*st.thr:0,now,0.08);audio.jbp.frequency.setTargetAtTime(500+rot*3,now,0.08);
-  const fp=panFor(st.pos);const far=G.cam==='pilot'?1/(1+fp.d/18):1;const lvl=(0.015+st.thr*0.09)*far;
+  const fp=panFor(st.pos);const far=G.cam==='pilot'?1/(1+fp.d/18):1;const lvl=(0.015+thrS*0.09)*far;
   audio.motor.gain.setTargetAtTime(on?lvl:0,now,0.05);audio.air.frequency.setTargetAtTime(G.cam==='pilot'?clamp(9000/(1+fp.d/25),700,9000):6000,now,0.1);
   if(audio.pan.pan)audio.pan.pan.setTargetAtTime(G.cam==='pilot'?fp.pan:0,now,0.05);
   const w=clamp((st.V-6)/22,0,1);audio.wind.gain.setTargetAtTime(on?w*w*(G.cam==='fpv'?0.25:G.cam==='chase'?0.12:0.03):0,now,0.1);audio.windF.frequency.setTargetAtTime(300+st.V*40,now,0.1);

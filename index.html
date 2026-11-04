@@ -67,6 +67,17 @@ canvas.gauge{background:rgba(27,34,43,.8);border:1px solid var(--line);border-ra
 #mpState.ok{color:var(--good)}#mpState.no{color:var(--bad)}
 .hgcode input{font:600 15px var(--mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;width:12em;text-transform:uppercase}
 #purMarks{position:fixed;inset:0;pointer-events:none;z-index:2}
+#bigMap{position:fixed;inset:0;z-index:40;background:rgba(14,18,23,.88);display:flex;align-items:center;justify-content:center;padding:12px}
+#bigMap[hidden]{display:none}
+#bigMap .bm{display:flex;flex-direction:column;gap:8px;width:min(94vw,calc(86vh - 60px));max-width:900px}
+#bigMap .bmHead{display:flex;align-items:center;gap:12px;color:#F7F4EE;font:600 15px Rajdhani,sans-serif}
+#bigMap .bmHead span{flex:1;color:#A3AEBA;font:12px 'IBM Plex Mono',monospace}
+#bigMap canvas{width:100%;aspect-ratio:1;border-radius:6px;background:#1B222B;touch-action:none}
+#bigMap .bmKey{color:#A3AEBA;font:11px 'IBM Plex Mono',monospace;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+#bigMap .bmKey i{display:inline-block;width:12px;height:8px;margin-right:4px;vertical-align:middle;border-radius:2px}
+@media (max-height:520px) and (orientation:landscape){#bigMap .bm{display:grid;grid-template-columns:auto 190px;grid-template-rows:auto 1fr;width:auto;height:calc(100vh - 24px);max-width:none;gap:8px 14px}
+  #bigMap canvas{grid-row:1/3;grid-column:1;height:100%;width:auto}#bigMap .bmHead{grid-column:2;flex-direction:column;align-items:stretch;gap:6px}#bigMap .bmKey{grid-column:2;align-content:flex-start}}
+.k-road{background:#cfc8bb}.k-water{background:#4f8fa8}.k-bld{background:#e6d6be}.k-field{background:#F26522}.k-me{background:#F5C542}.k-range{border:1px dashed #6FA8DC;background:none!important}
 .pm{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;font:600 12px var(--mono);letter-spacing:.04em;white-space:nowrap}
 .pm i{display:block;width:26px;height:26px;border:2px solid currentColor;border-radius:4px}
 .pm.edge i{width:0;height:0;border:none;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid currentColor;border-radius:0}
@@ -318,6 +329,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
       </div>
     </div>
     <div id="purMarks" hidden></div>
+    <div id="bigMap" hidden><div class="bm"><div class="bmHead"><b id="bmTitle">Map</b><span id="bmInfo"></span><button class="btn" id="bmClose">Close</button></div><canvas id="bmC" width="1024" height="1024"></canvas><div class="bmKey"><i class="k-road"></i>Roads <i class="k-water"></i>Water <i class="k-bld"></i>Buildings <i class="k-field"></i>Field <i class="k-me"></i>You <i class="k-range"></i>Radio range</div></div></div>
     <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
     <div id="status"><b id="sName">CraycleCub V2</b> · <span id="sField">Kurianad</span> · RWY 00 · <span id="sZone">Green 120 m</span> · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
@@ -333,6 +345,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-gear hidden>Gear down</button>
     <button class="btn" data-flap hidden>Flaps up</button>
     <button class="btn" data-mp hidden></button>
+    <button class="btn" data-map>Map</button>
     <button class="btn" data-tele>Telemetry: full</button>
     <button class="btn" data-sound>Sound off</button>
     <button class="btn" id="bPause">Pause</button>
@@ -344,6 +357,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-vtol hidden>Hover mode</button>
     <button class="btn" data-gear hidden>Gear down</button>
     <button class="btn" data-flap hidden>Flaps up</button>
+    <button class="btn" data-map>Map</button>
     <button class="btn" id="bPauseM" aria-label="Pause">II</button>
   </div>
   <div id="mmid"><span>THR <b id="mThr">0%</b></span><span class="rate" id="mRate" hidden>LOW RATE</span></div>
@@ -357,7 +371,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.13</div>
+        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.14</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -1705,7 +1719,7 @@ function showPad(){const el=$('txState');if(!el)return;const n=stickCount();if(p
 /* keyboard */
 const keys={};let kThr=0;
 window.addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;keys[e.code]=true;
-  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyV')toggleVtol();if(e.code==='KeyH'){G.kHold=!G.kHold;}if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
+  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyM')toggleBigMap();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyV')toggleVtol();if(e.code==='KeyH'){G.kHold=!G.kHold;}if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 
@@ -2143,10 +2157,46 @@ function updateHUD(dt){
   $('banner').hidden=!(G.cut&&G.flying);
   if(G.stab!==lastStab){lastStab=G.stab;applyStabLabel();}
   $('mThr').textContent=G.cut?'CUT':Math.round(IN.thr*100)+'%';$('mRate').hidden=!G.lowRate;
+  if(BIG.open&&(hudTick&3)===0)drawBigMap();
   if((hudTick++&1)===0){drawADI(a);if(!MOBILE||settings.tele==='full')drawMap(a);}
 }
 let lastStab=-1;
 
+/* ---------- full map: the whole flying area with real roads, water, buildings, land cover, the field, you and the radio range ---------- */
+const RADIO_R=Math.round(Math.max(1500,Math.min(MAP.size/2-400,3000)));
+const BIG={open:false,base:null,A:RADIO_R+450,wasPaused:false};
+function bigBase(){if(BIG.base)return BIG.base;const N=1024,A=BIG.A,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d');
+  const P=v=>(v+A)/(2*A)*N,S=N/(2*A);
+  /* land cover with hill shading from the real terrain */
+  const LCC=DECCAN?['#8a7d4f','#5d6a35','#7a7342','#9a8c55','#8f9450','#a39a8a','#ab977c','#000','#3f6d80','#6f8150','#3b6a40']:['#5e8a3c','#3f6a2e','#5f7a38','#86a052','#9bbd58','#97907e','#a8896a','#000','#3f6d80','#668a4c','#30603a'];
+  const B=8;for(let j=0;j<N;j+=B)for(let i=0;i<N;i+=B){const x=(i+B/2)/S-A,z=(j+B/2)/S-A;const k=FEAT?lcAt(x,z):0;
+    const h=groundH(x,z),gx=groundH(x+30,z)-h,gz=groundH(x,z+30)-h;const sh=clamp(1+(-gx*0.7-gz*0.4)/18,0.62,1.3);
+    const c0=new THREE.Color(LCC[k===7?0:k]);c0.multiplyScalar(sh);g.fillStyle='#'+c0.getHexString();g.fillRect(i,j,B,B);}
+  const poly=(p,close)=>{g.beginPath();g.moveTo(P(p[0]),P(p[1]));for(let q=2;q<p.length;q+=2)g.lineTo(P(p[q]),P(p[q+1]));if(close)g.closePath();};
+  g.lineCap=g.lineJoin='round';
+  if(FEAT){g.fillStyle='#4f8fa8';FEAT.wp.forEach(l=>{poly(l.p,true);g.fill();});g.strokeStyle='#4f8fa8';FEAT.wl.forEach(l=>{g.lineWidth=Math.max(1.2,WL_W[l.c]*S);poly(l.p);g.stroke();});}
+  else{const n=MAP.n,s=MAP.size,cs=s/(n-1);g.fillStyle='#4f8fa8';for(let jj=0;jj<n;jj++)for(let ii=0;ii<n;ii++)if(MAP.W[jj*n+ii]){const x=-s/2+ii*cs,z=-s/2+jj*cs;g.fillRect(P(x-cs/2),P(z-cs/2),cs*S+1,cs*S+1);}}
+  if(FEAT){[8,7,6,5,4,3,2,1].forEach(cl=>{g.strokeStyle=cl<=3?'#efe6d2':cl===8?'#b39b78':'#cfc8bb';g.lineWidth=Math.max(cl<=3?2.2:cl<=5?1.6:1,ROAD_W[cl]*S);FEAT.roads.forEach(l=>{if(l.c===cl){poly(l.p);g.stroke();}});});
+    g.fillStyle='#e6d6be';if(FEAT.blds)FEAT.blds.forEach(b=>{if(Math.abs(b.x)>A||Math.abs(b.z)>A)return;g.save();g.translate(P(b.x),P(b.z));g.rotate(b.a);g.fillRect(-Math.max(1,b.l*S)/2,-Math.max(1,b.w*S)/2,Math.max(1,b.l*S),Math.max(1,b.w*S));g.restore();});}
+  /* the field and strip */
+  g.fillStyle='rgba(242,101,34,.35)';g.fillRect(P(-75),P(-130),150*S,210*S);g.fillStyle='#F26522';g.fillRect(P(-3.5),P(-70),Math.max(2,7*S),90*S);
+  /* radio range and scale */
+  g.setLineDash([8,6]);g.strokeStyle='#6FA8DC';g.lineWidth=2;g.beginPath();g.arc(P(PILOT_EYE.x),P(PILOT_EYE.z),RADIO_R*S,0,Math.PI*2);g.stroke();
+  g.strokeStyle='rgba(247,244,238,.35)';g.lineWidth=1;g.beginPath();g.arc(P(PILOT_EYE.x),P(PILOT_EYE.z),450*S,0,Math.PI*2);g.stroke();g.setLineDash([]);
+  g.fillStyle='rgba(247,244,238,.7)';g.font='600 16px IBM Plex Mono,monospace';g.fillText('450 m: visual line of sight',P(PILOT_EYE.x)+6,P(PILOT_EYE.z-450)-6);
+  g.fillText('radio range '+(RADIO_R/1000).toFixed(1)+' km',P(PILOT_EYE.x)+6,P(PILOT_EYE.z-RADIO_R)+18);
+  g.fillStyle='rgba(27,34,43,.75)';g.fillRect(16,N-46,260,32);g.fillStyle='#F7F4EE';g.fillRect(28,N-26,1000*S,4);g.font='600 15px IBM Plex Mono,monospace';g.fillText('1 km',36+1000*S,N-20);
+  g.beginPath();g.moveTo(N-34,22);g.lineTo(N-44,48);g.lineTo(N-34,42);g.lineTo(N-24,48);g.closePath();g.fill();g.fillText('N',N-39,70);
+  if(MAP.home){g.fillStyle='#F5C542';g.strokeStyle='#1B222B';g.lineWidth=2;g.beginPath();g.arc(P(MAP.home[0]),P(MAP.home[1]),7,0,Math.PI*2);g.fill();g.stroke();g.fillStyle='#F7F4EE';g.fillText('Home',P(MAP.home[0])+10,P(MAP.home[1])+5);}
+  BIG.base=c;return c;}
+function drawBigMap(){if(!BIG.open)return;const cv=$('bmC'),g=cv.getContext('2d'),N=cv.width,A=BIG.A,P=v=>(v+A)/(2*A)*N;g.drawImage(bigBase(),0,0);
+  if(typeof MP!=='undefined'&&MP.on)MP.peers.forEach(Q=>{if(!Q.craft||!Q.craft.root.visible)return;const q=Q.craft.root.position;g.fillStyle='#6FA8DC';g.beginPath();g.arc(P(q.x),P(q.z),7,0,Math.PI*2);g.fill();});
+  if(typeof wardens!=='undefined')wardens.forEach(W=>{g.fillStyle=W.sees?'#E8503A':'#6FA8DC';g.beginPath();g.arc(P(W.pos.x),P(W.pos.z),8,0,Math.PI*2);g.fill();});
+  const a=attitude();g.save();g.translate(P(st.pos.x),P(st.pos.z));g.rotate(a.hdg*Math.PI/180);g.fillStyle='#F5C542';g.strokeStyle='#1B222B';g.lineWidth=2;g.beginPath();g.moveTo(0,-16);g.lineTo(-11,12);g.lineTo(0,6);g.lineTo(11,12);g.closePath();g.fill();g.stroke();g.restore();
+  const d=Math.hypot(st.pos.x-PILOT_EYE.x,st.pos.z-PILOT_EYE.z);$('bmInfo').textContent=(d<1000?Math.round(d)+' m':(d/1000).toFixed(2)+' km')+' from you · alt '+Math.max(0,st.pos.y).toFixed(0)+' m'+(G.failsafe?' · LINK LOST':'');}
+function toggleBigMap(){BIG.open=!BIG.open;$('bigMap').hidden=!BIG.open;$('bmTitle').textContent=(MAP.name||'Map')+' · '+(MAP.air?MAP.air.zone.toUpperCase()+' zone':'');
+  if(BIG.open){BIG.wasPaused=G.paused;if(G.flying&&!G.crashed&&!G.landed)G.paused=true;drawBigMap();}
+  else if(!BIG.wasPaused&&G.flying&&!G.crashed&&!G.landed&&$('overlay').hidden){G.paused=false;last=performance.now();}}
 
 const on=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
 const onAll=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener('click',fn));
@@ -2165,7 +2215,7 @@ function save(){store.set('jgsim.log',logbook);}
 function saveSettings(){store.set('jgsim.settings',settings);}
 function haptic(ms){try{if(settings.haptics&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
 function reset(){
-  st=Sim.create();G.gearUp=false;G.flapPos=0;G.vtolPlane=false;G.kHold=false;vtolWatch.s=undefined;heliWatch.sp=0;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
+  st=Sim.create();G.failsafe=false;G.gearUp=false;G.flapPos=0;G.vtolPlane=false;G.kHold=false;vtolWatch.s=undefined;heliWatch.sp=0;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
   MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
   gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
   gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
@@ -2312,7 +2362,7 @@ on('bHangarBack',back);
 on('bTxWizard',()=>startWizard(0));on('bTxBack',()=>{wiz.on=false;swCap=null;$('wiz').hidden=true;back();});
 on('bClear',startFlight);on('bSkipPre',startFlight);on('bPreTx',()=>openTx(false));on('bPreBack',back);
 on('bAgain',reset);on('bLandAgain',reset);on('bLandLog',showLog);on('bWinGo',hide);on('bWinAgain',reset);on('bCrashMenu',toMenu);on('bLandMenu',toMenu);
-onAll('[data-cam]',cycleCam);onAll('[data-gear]',toggleGear);onAll('[data-vtol]',toggleVtol);onAll('[data-flap]',cycleFlaps);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
+onAll('[data-map]',toggleBigMap);on('bmClose',toggleBigMap);onAll('[data-cam]',cycleCam);onAll('[data-gear]',toggleGear);onAll('[data-vtol]',toggleVtol);onAll('[data-flap]',cycleFlaps);onAll('[data-tele]',cycleTelemetry);onAll('[data-stab]',cycleStab);onAll('[data-mode]',()=>setMode(G.mode==='free'?'gates':'free'));
 onAll('[data-sound]',()=>{if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();G.sound=!G.sound;document.querySelectorAll('[data-sound]').forEach(b=>b.textContent='Sound '+(G.sound?'on':'off'));});
 on('bPause',togglePause);on('bPauseM',togglePause);on('bResume',togglePause);
 on('bPauseTx',()=>openTx(false));on('bPauseLog',showLog);on('bPauseReset',reset);on('bPauseMenu',toMenu);on('bPauseField',()=>show('fieldCard'));
@@ -2343,6 +2393,13 @@ function frame(now){
   const dt=clamp((now-last)/1000,0,0.05);last=now;
   if(!isFinite(st.pos.x)){reset();say('Sim state reset after a numeric fault.','warn');}
   readInput();
+  /* radio range instead of an invisible wall: past it (or above 700 m) the link drops, failsafe cuts the motor and centres the sticks,
+     the way an FS-i6 receiver does, until the aircraft is back inside */
+  if(G.flying&&!G.crashed&&!G.landed){const dR=Math.hypot(st.pos.x-PILOT_EYE.x,st.pos.z-PILOT_EYE.z);
+    if(dR>RADIO_R||st.pos.y>700){if(!G.failsafe){G.failsafe=true;haptic([40,30,40]);say('Radio link lost at '+Math.round(dR)+' m. Failsafe cut the motor: it glides with the sticks centred until it is back inside '+(RADIO_R/1000).toFixed(1)+' km.','bad');}}
+    else if(G.failsafe&&dR<RADIO_R-60&&st.pos.y<680){G.failsafe=false;say('Radio link back. You have control.','good');}
+    else if(!G.failsafe&&dR>RADIO_R-250)say('Radio range ends at '+(RADIO_R/1000).toFixed(1)+' km. You are at '+(dR/1000).toFixed(2)+' km. Turn back.','warn','range',8);
+    if(G.failsafe){IN.thr=0;IN.ail=0;IN.ele=0;IN.rud=0;}}
   const has=!!pad;if(padShown!==has){padShown=has;showPad();}
   updatePreflight();updateTx();
   adaptResolution(dt);updateParticles(dt);updateTweens(dt);updateClouds(dt);
@@ -2355,7 +2412,6 @@ function frame(now){
       {const w=hitObstacle(st.pos);if(w)crash=w;}
       if(Math.abs(st.pos.x-18)<5.4&&Math.abs(st.pos.z-10)<4.4&&st.pos.y<4.5)crash='Flew into the hangar.';
       if(!crash){const gh=groundH(st.pos.x,st.pos.z);if(st.pos.y<gh+0.1&&gh>0.3)crash='Flew into the hillside.';}
-      if(st.pos.y>700||Math.abs(st.pos.x)>1100||Math.abs(st.pos.z)>1100)crash='Flew out of the field.';
     }
     if(st.airborne&&!G.flightStart){G.flightStart=st.time;say('Airborne. Climb straight ahead to 30 m before the first turn.','good');}
     if(crash)endFlight('crash',crash);

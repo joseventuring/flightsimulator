@@ -51,7 +51,43 @@ function updateHUD(dt){
   $('banner').hidden=!(G.cut&&G.flying);
   if(G.stab!==lastStab){lastStab=G.stab;applyStabLabel();}
   $('mThr').textContent=G.cut?'CUT':Math.round(IN.thr*100)+'%';$('mRate').hidden=!G.lowRate;
+  if(BIG.open&&(hudTick&3)===0)drawBigMap();
   if((hudTick++&1)===0){drawADI(a);if(!MOBILE||settings.tele==='full')drawMap(a);}
 }
 let lastStab=-1;
 
+/* ---------- full map: the whole flying area with real roads, water, buildings, land cover, the field, you and the radio range ---------- */
+const RADIO_R=Math.round(Math.max(1500,Math.min(MAP.size/2-400,3000)));
+const BIG={open:false,base:null,A:RADIO_R+450,wasPaused:false};
+function bigBase(){if(BIG.base)return BIG.base;const N=1024,A=BIG.A,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d');
+  const P=v=>(v+A)/(2*A)*N,S=N/(2*A);
+  /* land cover with hill shading from the real terrain */
+  const LCC=DECCAN?['#8a7d4f','#5d6a35','#7a7342','#9a8c55','#8f9450','#a39a8a','#ab977c','#000','#3f6d80','#6f8150','#3b6a40']:['#5e8a3c','#3f6a2e','#5f7a38','#86a052','#9bbd58','#97907e','#a8896a','#000','#3f6d80','#668a4c','#30603a'];
+  const B=8;for(let j=0;j<N;j+=B)for(let i=0;i<N;i+=B){const x=(i+B/2)/S-A,z=(j+B/2)/S-A;const k=FEAT?lcAt(x,z):0;
+    const h=groundH(x,z),gx=groundH(x+30,z)-h,gz=groundH(x,z+30)-h;const sh=clamp(1+(-gx*0.7-gz*0.4)/18,0.62,1.3);
+    const c0=new THREE.Color(LCC[k===7?0:k]);c0.multiplyScalar(sh);g.fillStyle='#'+c0.getHexString();g.fillRect(i,j,B,B);}
+  const poly=(p,close)=>{g.beginPath();g.moveTo(P(p[0]),P(p[1]));for(let q=2;q<p.length;q+=2)g.lineTo(P(p[q]),P(p[q+1]));if(close)g.closePath();};
+  g.lineCap=g.lineJoin='round';
+  if(FEAT){g.fillStyle='#4f8fa8';FEAT.wp.forEach(l=>{poly(l.p,true);g.fill();});g.strokeStyle='#4f8fa8';FEAT.wl.forEach(l=>{g.lineWidth=Math.max(1.2,WL_W[l.c]*S);poly(l.p);g.stroke();});}
+  else{const n=MAP.n,s=MAP.size,cs=s/(n-1);g.fillStyle='#4f8fa8';for(let jj=0;jj<n;jj++)for(let ii=0;ii<n;ii++)if(MAP.W[jj*n+ii]){const x=-s/2+ii*cs,z=-s/2+jj*cs;g.fillRect(P(x-cs/2),P(z-cs/2),cs*S+1,cs*S+1);}}
+  if(FEAT){[8,7,6,5,4,3,2,1].forEach(cl=>{g.strokeStyle=cl<=3?'#efe6d2':cl===8?'#b39b78':'#cfc8bb';g.lineWidth=Math.max(cl<=3?2.2:cl<=5?1.6:1,ROAD_W[cl]*S);FEAT.roads.forEach(l=>{if(l.c===cl){poly(l.p);g.stroke();}});});
+    g.fillStyle='#e6d6be';if(FEAT.blds)FEAT.blds.forEach(b=>{if(Math.abs(b.x)>A||Math.abs(b.z)>A)return;g.save();g.translate(P(b.x),P(b.z));g.rotate(b.a);g.fillRect(-Math.max(1,b.l*S)/2,-Math.max(1,b.w*S)/2,Math.max(1,b.l*S),Math.max(1,b.w*S));g.restore();});}
+  /* the field and strip */
+  g.fillStyle='rgba(242,101,34,.35)';g.fillRect(P(-75),P(-130),150*S,210*S);g.fillStyle='#F26522';g.fillRect(P(-3.5),P(-70),Math.max(2,7*S),90*S);
+  /* radio range and scale */
+  g.setLineDash([8,6]);g.strokeStyle='#6FA8DC';g.lineWidth=2;g.beginPath();g.arc(P(PILOT_EYE.x),P(PILOT_EYE.z),RADIO_R*S,0,Math.PI*2);g.stroke();
+  g.strokeStyle='rgba(247,244,238,.35)';g.lineWidth=1;g.beginPath();g.arc(P(PILOT_EYE.x),P(PILOT_EYE.z),450*S,0,Math.PI*2);g.stroke();g.setLineDash([]);
+  g.fillStyle='rgba(247,244,238,.7)';g.font='600 16px IBM Plex Mono,monospace';g.fillText('450 m: visual line of sight',P(PILOT_EYE.x)+6,P(PILOT_EYE.z-450)-6);
+  g.fillText('radio range '+(RADIO_R/1000).toFixed(1)+' km',P(PILOT_EYE.x)+6,P(PILOT_EYE.z-RADIO_R)+18);
+  g.fillStyle='rgba(27,34,43,.75)';g.fillRect(16,N-46,260,32);g.fillStyle='#F7F4EE';g.fillRect(28,N-26,1000*S,4);g.font='600 15px IBM Plex Mono,monospace';g.fillText('1 km',36+1000*S,N-20);
+  g.beginPath();g.moveTo(N-34,22);g.lineTo(N-44,48);g.lineTo(N-34,42);g.lineTo(N-24,48);g.closePath();g.fill();g.fillText('N',N-39,70);
+  if(MAP.home){g.fillStyle='#F5C542';g.strokeStyle='#1B222B';g.lineWidth=2;g.beginPath();g.arc(P(MAP.home[0]),P(MAP.home[1]),7,0,Math.PI*2);g.fill();g.stroke();g.fillStyle='#F7F4EE';g.fillText('Home',P(MAP.home[0])+10,P(MAP.home[1])+5);}
+  BIG.base=c;return c;}
+function drawBigMap(){if(!BIG.open)return;const cv=$('bmC'),g=cv.getContext('2d'),N=cv.width,A=BIG.A,P=v=>(v+A)/(2*A)*N;g.drawImage(bigBase(),0,0);
+  if(typeof MP!=='undefined'&&MP.on)MP.peers.forEach(Q=>{if(!Q.craft||!Q.craft.root.visible)return;const q=Q.craft.root.position;g.fillStyle='#6FA8DC';g.beginPath();g.arc(P(q.x),P(q.z),7,0,Math.PI*2);g.fill();});
+  if(typeof wardens!=='undefined')wardens.forEach(W=>{g.fillStyle=W.sees?'#E8503A':'#6FA8DC';g.beginPath();g.arc(P(W.pos.x),P(W.pos.z),8,0,Math.PI*2);g.fill();});
+  const a=attitude();g.save();g.translate(P(st.pos.x),P(st.pos.z));g.rotate(a.hdg*Math.PI/180);g.fillStyle='#F5C542';g.strokeStyle='#1B222B';g.lineWidth=2;g.beginPath();g.moveTo(0,-16);g.lineTo(-11,12);g.lineTo(0,6);g.lineTo(11,12);g.closePath();g.fill();g.stroke();g.restore();
+  const d=Math.hypot(st.pos.x-PILOT_EYE.x,st.pos.z-PILOT_EYE.z);$('bmInfo').textContent=(d<1000?Math.round(d)+' m':(d/1000).toFixed(2)+' km')+' from you · alt '+Math.max(0,st.pos.y).toFixed(0)+' m'+(G.failsafe?' · LINK LOST':'');}
+function toggleBigMap(){BIG.open=!BIG.open;$('bigMap').hidden=!BIG.open;$('bmTitle').textContent=(MAP.name||'Map')+' · '+(MAP.air?MAP.air.zone.toUpperCase()+' zone':'');
+  if(BIG.open){BIG.wasPaused=G.paused;if(G.flying&&!G.crashed&&!G.landed)G.paused=true;drawBigMap();}
+  else if(!BIG.wasPaused&&G.flying&&!G.crashed&&!G.landed&&$('overlay').hidden){G.paused=false;last=performance.now();}}

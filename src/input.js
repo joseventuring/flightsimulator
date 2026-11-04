@@ -44,7 +44,7 @@ function showPad(){const el=$('txState');if(!el)return;const n=stickCount();if(p
 /* keyboard */
 const keys={};let kThr=0;
 window.addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;keys[e.code]=true;
-  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyV')toggleVtol();if(e.code==='KeyH'){G.kHold=!G.kHold;}if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
+  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyM')toggleBigMap();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyV')toggleVtol();if(e.code==='KeyH'){G.kHold=!G.kHold;}if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 

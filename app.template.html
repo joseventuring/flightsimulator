@@ -57,6 +57,17 @@ canvas.gauge{background:rgba(27,34,43,.8);border:1px solid var(--line);border-ra
 #mpState.ok{color:var(--good)}#mpState.no{color:var(--bad)}
 .hgcode input{font:600 15px var(--mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;width:12em;text-transform:uppercase}
 #purMarks{position:fixed;inset:0;pointer-events:none;z-index:2}
+#bigMap{position:fixed;inset:0;z-index:40;background:rgba(14,18,23,.88);display:flex;align-items:center;justify-content:center;padding:12px}
+#bigMap[hidden]{display:none}
+#bigMap .bm{display:flex;flex-direction:column;gap:8px;width:min(94vw,calc(86vh - 60px));max-width:900px}
+#bigMap .bmHead{display:flex;align-items:center;gap:12px;color:#F7F4EE;font:600 15px Rajdhani,sans-serif}
+#bigMap .bmHead span{flex:1;color:#A3AEBA;font:12px 'IBM Plex Mono',monospace}
+#bigMap canvas{width:100%;aspect-ratio:1;border-radius:6px;background:#1B222B;touch-action:none}
+#bigMap .bmKey{color:#A3AEBA;font:11px 'IBM Plex Mono',monospace;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+#bigMap .bmKey i{display:inline-block;width:12px;height:8px;margin-right:4px;vertical-align:middle;border-radius:2px}
+@media (max-height:520px) and (orientation:landscape){#bigMap .bm{display:grid;grid-template-columns:auto 190px;grid-template-rows:auto 1fr;width:auto;height:calc(100vh - 24px);max-width:none;gap:8px 14px}
+  #bigMap canvas{grid-row:1/3;grid-column:1;height:100%;width:auto}#bigMap .bmHead{grid-column:2;flex-direction:column;align-items:stretch;gap:6px}#bigMap .bmKey{grid-column:2;align-content:flex-start}}
+.k-road{background:#cfc8bb}.k-water{background:#4f8fa8}.k-bld{background:#e6d6be}.k-field{background:#F26522}.k-me{background:#F5C542}.k-range{border:1px dashed #6FA8DC;background:none!important}
 .pm{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;font:600 12px var(--mono);letter-spacing:.04em;white-space:nowrap}
 .pm i{display:block;width:26px;height:26px;border:2px solid currentColor;border-radius:4px}
 .pm.edge i{width:0;height:0;border:none;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid currentColor;border-radius:0}
@@ -306,6 +317,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
       </div>
     </div>
     <div id="purMarks" hidden></div>
+    <div id="bigMap" hidden><div class="bm"><div class="bmHead"><b id="bmTitle">Map</b><span id="bmInfo"></span><button class="btn" id="bmClose">Close</button></div><canvas id="bmC" width="1024" height="1024"></canvas><div class="bmKey"><i class="k-road"></i>Roads <i class="k-water"></i>Water <i class="k-bld"></i>Buildings <i class="k-field"></i>Field <i class="k-me"></i>You <i class="k-range"></i>Radio range</div></div></div>
     <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
     <div id="status"><b id="sName">CraycleCub V2</b> · <span id="sField">Kurianad</span> · RWY 00 · <span id="sZone">Green 120 m</span> · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
@@ -321,6 +333,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-gear hidden>Gear down</button>
     <button class="btn" data-flap hidden>Flaps up</button>
     <button class="btn" data-mp hidden></button>
+    <button class="btn" data-map>Map</button>
     <button class="btn" data-tele>Telemetry: full</button>
     <button class="btn" data-sound>Sound off</button>
     <button class="btn" id="bPause">Pause</button>
@@ -332,6 +345,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-vtol hidden>Hover mode</button>
     <button class="btn" data-gear hidden>Gear down</button>
     <button class="btn" data-flap hidden>Flaps up</button>
+    <button class="btn" data-map>Map</button>
     <button class="btn" id="bPauseM" aria-label="Pause">II</button>
   </div>
   <div id="mmid"><span>THR <b id="mThr">0%</b></span><span class="rate" id="mRate" hidden>LOW RATE</span></div>
@@ -345,7 +359,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.13</div>
+        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.14</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -571,6 +585,13 @@ function frame(now){
   const dt=clamp((now-last)/1000,0,0.05);last=now;
   if(!isFinite(st.pos.x)){reset();say('Sim state reset after a numeric fault.','warn');}
   readInput();
+  /* radio range instead of an invisible wall: past it (or above 700 m) the link drops, failsafe cuts the motor and centres the sticks,
+     the way an FS-i6 receiver does, until the aircraft is back inside */
+  if(G.flying&&!G.crashed&&!G.landed){const dR=Math.hypot(st.pos.x-PILOT_EYE.x,st.pos.z-PILOT_EYE.z);
+    if(dR>RADIO_R||st.pos.y>700){if(!G.failsafe){G.failsafe=true;haptic([40,30,40]);say('Radio link lost at '+Math.round(dR)+' m. Failsafe cut the motor: it glides with the sticks centred until it is back inside '+(RADIO_R/1000).toFixed(1)+' km.','bad');}}
+    else if(G.failsafe&&dR<RADIO_R-60&&st.pos.y<680){G.failsafe=false;say('Radio link back. You have control.','good');}
+    else if(!G.failsafe&&dR>RADIO_R-250)say('Radio range ends at '+(RADIO_R/1000).toFixed(1)+' km. You are at '+(dR/1000).toFixed(2)+' km. Turn back.','warn','range',8);
+    if(G.failsafe){IN.thr=0;IN.ail=0;IN.ele=0;IN.rud=0;}}
   const has=!!pad;if(padShown!==has){padShown=has;showPad();}
   updatePreflight();updateTx();
   adaptResolution(dt);updateParticles(dt);updateTweens(dt);updateClouds(dt);
@@ -583,7 +604,6 @@ function frame(now){
       {const w=hitObstacle(st.pos);if(w)crash=w;}
       if(Math.abs(st.pos.x-18)<5.4&&Math.abs(st.pos.z-10)<4.4&&st.pos.y<4.5)crash='Flew into the hangar.';
       if(!crash){const gh=groundH(st.pos.x,st.pos.z);if(st.pos.y<gh+0.1&&gh>0.3)crash='Flew into the hillside.';}
-      if(st.pos.y>700||Math.abs(st.pos.x)>1100||Math.abs(st.pos.z)>1100)crash='Flew out of the field.';
     }
     if(st.airborne&&!G.flightStart){G.flightStart=st.time;say('Airborne. Climb straight ahead to 30 m before the first turn.','good');}
     if(crash)endFlight('crash',crash);

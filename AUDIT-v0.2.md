@@ -181,3 +181,19 @@ What changed
 - Private build: `python3 build.py --private` adds `private/maps/*` (git-ignored) and writes `private/dist/index.html`. It is never published.
 
 Credits shown in the field card: OpenStreetMap contributors, Overture Maps Foundation, Microsoft and Google Open Buildings (ODbL), and ESA WorldCover 2021 (CC BY 4.0).
+
+## v0.14 (4 Nov 2026): radio range instead of a crash wall, and a full map
+
+Feedback: the game showed a crash while JJ was still flying, mostly at long distances, and the map could not be seen.
+- Cause of the crash: a leftover rule from the old 2 km test field ended any flight past 1.1 km from the field, or above 700 m, with "Flew out of the field". It is gone.
+- In its place, a radio range of 3 km (1.5 to 3 km depending on map size).
+  - A warning comes 250 m before the edge.
+  - Past the edge, the link drops and failsafe cuts the motor and centres the sticks, the way an FS-i6 receiver does. The aircraft glides, and control comes back inside the range.
+  - Nothing ends the flight unless it actually hits something.
+- Why the map was not visible: the corner map inset is part of full telemetry, and phones default to minimal.
+- New full map: the Map button (or M) opens the whole area on any device, with the flight paused. It shows:
+  - real land cover with hill shading, roads, water and buildings;
+  - the field, your position and heading, other pilots, Wardens and your home pin (private build only);
+  - the 450 m visual line-of-sight ring, the radio range and a 1 km scale.
+  - On phones in landscape, the map and its legend sit side by side.
+- The 450 m line-of-sight call is unchanged. It records a rule violation, as in real flying, but does not end the flight.

@@ -17,7 +17,7 @@ function updateWind(dt){
   const f=clamp(Math.log(h/0.03)/Math.log(10/0.03),0.2,1.15);
   wind.vec.set((wind.mean.x+wind.gx)*f,wind.gy*f,(wind.mean.z+wind.gz)*f);
 }
-const env={wind:wind.vec,rho:1.18,surfaceAt:(x,z)=>(Math.abs(x)<3.5&&z<20&&z>-70)?'strip':'grass'};
+const env={wind:wind.vec,rho:1.18,ground:(x,z)=>terrainH(x,z),surfaceAt:(x,z)=>(Math.abs(x)<3.5&&z<20&&z>-70)?'strip':'grass'};
 
 /* ---------- field marshal ---------- */
 const MSG=[];const cool={};
@@ -28,9 +28,10 @@ function renderMarshal(){$('marshal').innerHTML=MSG.map(m=>`<div class="m ${m.ki
 function violation(text,key){if(cool['v'+key]&&st.time-cool['v'+key]<8)return;cool['v'+key]=st.time;G.viol++;logbook.violations++;save();say(text,'bad');}
 function marshal(){
   if(!st.airborne)return;
-  const alt=st.pos.y, d=Math.hypot(st.pos.x-PILOT_EYE.x,st.pos.z-PILOT_EYE.z);
-  if(alt>=120)violation('Above the 120 m DGCA ceiling. Descend now.','ceil');
-  else if(alt>=100)say('Altitude '+Math.round(alt)+' m. Ceiling is 120 m AGL.','warn','alt',15);
+  /* height above the ground under the aircraft, against this site's green-zone ceiling (120 m, or 60 m within 8 to 12 km of an airport) */
+  const alt=st.pos.y-Math.max(0,terrainH(st.pos.x,st.pos.z)), d=Math.hypot(st.pos.x-PILOT_EYE.x,st.pos.z-PILOT_EYE.z), ceil=MAP.air.ceil||120;
+  if(alt>=ceil)violation('Above the '+ceil+' m green-zone ceiling here. Descend now.','ceil');
+  else if(alt>=ceil-20)say('Altitude '+Math.round(alt)+' m. Ceiling here is '+ceil+' m above ground.','warn','alt',15);
   if(st.pos.z>2&&Math.abs(st.pos.x)<80&&alt>0.5&&!st.onGround)violation('Behind the flight line. Turn out, now.','line');
   if(st.pos.x>6&&st.pos.x<32&&st.pos.z>-2&&st.pos.z<22&&alt<30&&!st.onGround)violation('Over the pits. Never overfly people or cars.','pits');
   if(d>450)violation('Lost visual at '+Math.round(d)+' m. Bring it back inside 300 m.','los');

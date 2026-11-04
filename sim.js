@@ -117,7 +117,7 @@ function step(st,inp,dt,env){
     const W=AC.wheels[i];
     if(st.gearPos>0.5)break;
     _pw.copy(W.p).applyQuaternion(st.q).add(st.pos);
-    const pen=W.r-_pw.y; st.wheelN[i]=0;
+    const gh=env.ground?env.ground(_pw.x,_pw.z):0; const pen=W.r-(_pw.y-gh); st.wheelN[i]=0;
     if(pen<=0)continue;
     _ww.copy(st.w).applyQuaternion(st.q); _rw.copy(W.p).applyQuaternion(st.q);
     _vw.copy(_ww).cross(_rw).add(st.vel);
@@ -153,7 +153,7 @@ function step(st,inp,dt,env){
   // crash points
   if(st.time>0.5&&!crash){
     for(const cp of AC.crashPts){_pw.copy(cp[1]).applyQuaternion(st.q).add(st.pos);
-      if(_pw.y<0){if(st.gearPos>0.5&&(cp[0]==='nose'||cp[0]==='belly'||cp[0]==='prop')){crash='Landed with the gear up. Lower it on the downwind leg.';break;}crash=cp[0]==='prop'?(st.airborne&&!st.onGround?'Nosed in. Too much sink with the nose down.':st.thr>0.1?'Prop strike. The nose went over with power on.':'Nosed over.'):cp[0]==='fin'?'Went in inverted.':cp[0]==='belly'?(st.gearPos>0.5?'Landed with the gear up.':'Belly hit the ground.'):'Dragged the '+cp[0]+'.';break;}
+      if(_pw.y<(env.ground?env.ground(_pw.x,_pw.z):0)){if(st.gearPos>0.5&&(cp[0]==='nose'||cp[0]==='belly'||cp[0]==='prop')){crash='Landed with the gear up. Lower it on the downwind leg.';break;}crash=cp[0]==='prop'?(st.airborne&&!st.onGround?'Nosed in. Too much sink with the nose down.':st.thr>0.1?'Prop strike. The nose went over with power on.':'Nosed over.'):cp[0]==='fin'?'Went in inverted.':cp[0]==='belly'?(st.gearPos>0.5?'Landed with the gear up.':'Belly hit the ground.'):'Dragged the '+cp[0]+'.';break;}
     }
   }
   if(st.dbg){st.dbg.Nfin=-lf*FYf;st.dbg.Nswirl=-AC.kSwirl*T*slowF;st.dbg.Nrate=V>1?qd*AC.S*b*(AC.Cnp*(-st.w.z)*b/(2*V)+AC.Cnr*r*b/(2*V)):0;st.dbg.wN=st.wheelN.slice();st.dbg.bf=bf;}
@@ -269,7 +269,7 @@ function stepHeli(st,inp,dt,env){
   const Pm=Qm*st.rotorW/AC.motorEff;st.amp=0.5+Pm/Math.max(st.volt,1);st.usedAh+=st.amp*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);
   /* ground: skid contact points; blade strike if it tips with the rotor turning, hard landings, tail strikes */
   let contact=false,hit=0,hitH=0,crash=null;
-  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=-_pw.y;if(pen<=0)continue;
+  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=(env.ground?env.ground(_pw.x,_pw.z):0)-_pw.y;if(pen<=0)continue;
     _ww.copy(st.w).applyQuaternion(st.q);_rw.copy(p).applyQuaternion(st.q);_cv.copy(_ww).cross(_rw).add(st.vel);
     let N=AC.kWheel*pen-AC.cWheel*_cv.y;if(N<0)N=0;const vt=Math.hypot(_cv.x,_cv.z);
     _Fw.set(0,N,0);if(vt>1e-4){const f=Math.min(0.5*N,AC.mass*vt/dt*0.25);_Fw.x-=f*_cv.x/vt;_Fw.z-=f*_cv.z/vt;}
@@ -332,7 +332,7 @@ function stepQuad(st,inp,dt,env){
   st.amp=(on?AC.Iidle:0)+AC.Imax*pw;st.usedAh+=st.amp*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);
   /* ground: frame contact points, spring-damper with friction; hard hits and turtling end the flight */
   let contact=false,hit=0,hitH=0,crash=null;
-  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=-_pw.y;if(pen<=0)continue;
+  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=(env.ground?env.ground(_pw.x,_pw.z):0)-_pw.y;if(pen<=0)continue;
     _ww.copy(st.w).applyQuaternion(st.q);_rw.copy(p).applyQuaternion(st.q);_cv.copy(_ww).cross(_rw).add(st.vel);
     let N=AC.kWheel*pen-AC.cWheel*_cv.y;if(N<0)N=0;const vt=Math.hypot(_cv.x,_cv.z);
     _Fw.set(0,N,0);if(vt>1e-4){const f=Math.min(0.6*N,AC.mass*vt/dt*0.25);_Fw.x-=f*_cv.x/vt;_Fw.z-=f*_cv.z/vt;}

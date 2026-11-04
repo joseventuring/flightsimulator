@@ -1,6 +1,6 @@
 /* ---------- renderer (threejs-scene-setup, performance-optimization) ---------- */
 const canvas=$('c');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:!MOBILE,powerPreference:'high-performance'});
+const renderer=new THREE.WebGLRenderer({canvas,antialias:!MOBILE,powerPreference:'high-performance',logarithmicDepthBuffer:true}); // the real maps span 14 km: log depth stops the field overlays flickering
 const PR_MAX=MOBILE?Math.min(devicePixelRatio||1,1.75):Math.min(devicePixelRatio||1,1.5);let pixelRatio=MOBILE?Math.min(1.25,PR_MAX):PR_MAX;renderer.setPixelRatio(pixelRatio);
 renderer.shadowMap.enabled=settings.shadow; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
@@ -9,8 +9,8 @@ function adaptResolution(dt){perfAcc+=dt*1000;perfN++;perfCool-=dt;if(perfN<180)
 const scene=new THREE.Scene();
 const HAZE=new THREE.Color(0xC9D6DF);
 scene.background=HAZE.clone();
-scene.fog=new THREE.FogExp2(HAZE.getHex(),MOBILE?0.0012:0.00105);
-const camera=new THREE.PerspectiveCamera(50,1,0.08,4000);
+scene.fog=new THREE.FogExp2(HAZE.getHex(),MOBILE?0.00045:0.00038); // about 4 to 5 km of visibility: lakes and ridges on the real maps read
+const camera=new THREE.PerspectiveCamera(50,1,0.08,9000);
 const lam=c=>new THREE.MeshLambertMaterial({color:c});
 const pbr=(c,r)=>new THREE.MeshStandardMaterial({color:c,roughness:r===undefined?0.55:r,metalness:0});
 let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
@@ -33,19 +33,39 @@ function vnoise(x,z){const xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi,u=x
 function fbm(x,z){let s=0,a=0.5,f=1;for(let i=0;i<5;i++){s+=a*vnoise(x*f,z*f);f*=2.03;a*=0.5;}return s;}
 const FIELD_C={x:0,z:-20};
 const smooth=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);};
-function terrainH(x,z){const r=Math.hypot(x-FIELD_C.x,z-FIELD_C.z);if(r<380)return 0;
-  const k=smooth(380,950,r), ridge=smooth(900,1700,r);
-  const n=fbm(x*0.0024+11,z*0.0024-7);const rid=1-Math.abs(fbm(x*0.0012-3,z*0.0012+5)*2-1);
-  return k*(n*55+8)+ridge*(rid*rid*180+n*40)+smooth(380,520,r)*1.2*Math.sin(x*0.03)*Math.cos(z*0.027);}
+/* real terrain: the field is levelled out to 250 m, then blends into the elevation data by 520 m; lake beds sit under the water */
+function terrainH(x,z){const r=Math.hypot(x-FIELD_C.x,z-FIELD_C.z);if(r<250)return 0;const k=smooth(250,520,r);let h=k*demH(x,z);
+  const wc=waterCell(x,z);if(wc>=0)h=Math.min(h,MAP.L[wc]-1.5);return h;}
+const DECCAN=MAP.theme==='deccan';
 function detailTex(base,spots,n,size){const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');g.fillStyle=base;g.fillRect(0,0,size,size);for(let i=0;i<n;i++){g.fillStyle=spots[(Math.random()*spots.length)|0];const w=1+Math.random()*2,h=2+Math.random()*5;g.globalAlpha=0.35+Math.random()*0.5;g.fillRect(Math.random()*size,Math.random()*size,w,h);}g.globalAlpha=1;const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=MOBILE?2:8;t.encoding=THREE.sRGBEncoding;return t;}
 /* real textures (Poly Haven, CC0) load over the procedural ones; if they fail, the procedural ones stay */
 const texLoader=new THREE.TextureLoader();
 function upgradeMap(mat,url,repeat){texLoader.load(url,t=>{t.encoding=THREE.sRGBEncoding;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.copy(repeat);t.anisotropy=MOBILE?4:8;mat.map=t;mat.needsUpdate=true;},undefined,()=>{});}
 const grassMap=detailTex('#7f9a5a',['#6b8a46','#8fae63','#5f7d3e','#9cb56f','#74924f'],9000,256);grassMap.repeat.set(420,420);
-{const S=4200,N=MOBILE?140:200;const geo=new THREE.PlaneGeometry(S,S,N,N);geo.rotateX(-Math.PI/2);const pos=geo.attributes.position;const col=new Float32Array(pos.count*3);const cA=new THREE.Color(0x6d8f45),cB=new THREE.Color(0x4f6f34),cC=new THREE.Color(0x3e5a2c),cD=new THREE.Color(0x8a9a5c),tmp=new THREE.Color();
-  for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i);const h=terrainH(x,z);pos.setY(i,h);const n=fbm(x*0.01,z*0.01);tmp.copy(cA).lerp(cB,n);if(h>40)tmp.lerp(cC,clamp((h-40)/120,0,0.8));if(h<0.5&&Math.hypot(x,z+20)>200)tmp.lerp(cD,0.25*fbm(x*0.03,z*0.03));col[i*3]=tmp.r;col[i*3+1]=tmp.g;col[i*3+2]=tmp.b;}
+{const S=MAP.size,N=MOBILE?160:260;const geo=new THREE.PlaneGeometry(S,S,N,N);geo.rotateX(-Math.PI/2);const pos=geo.attributes.position;const col=new Float32Array(pos.count*3);
+  /* Kerala: wet greens, darker on the rubber hills. Deccan: dry khaki grass, olive scrub, pink-grey granite on the slopes */
+  const cA=new THREE.Color(DECCAN?0x7d7040:0x5a8436),cB=new THREE.Color(DECCAN?0x5c5a2c:0x3f6228),cC=new THREE.Color(DECCAN?0x6e5c4a:0x34502a),cD=new THREE.Color(DECCAN?0x4f5e2c:0x7a8d4c),tmp=new THREE.Color();
+  for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i);const h=terrainH(x,z);pos.setY(i,h);const n=fbm(x*0.01,z*0.01);tmp.copy(cA).lerp(cB,n);
+    const sl=Math.min(1,Math.hypot(terrainH(x+20,z)-h,terrainH(x,z+20)-h)/9);
+    if(DECCAN){tmp.lerp(cC,clamp(sl*1.2,0,0.85));if(waterCell(x,z)>=0||waterCell(x+40,z)>=0||waterCell(x,z+40)>=0)tmp.lerp(cD,0.7);}
+    else{if(h>40)tmp.lerp(cC,clamp((h-40)/120,0,0.8));if(h<0.5&&Math.hypot(x,z+20)>200)tmp.lerp(cD,0.25*fbm(x*0.03,z*0.03));tmp.lerp(cC,sl*0.35);}
+    /* baked hillshade: slopes facing a low western sun lighten, the far sides darken, so the real ridges and valleys read from the field */
+    {const gx=(terrainH(x+30,z)-terrainH(x-30,z))/60,gz=(terrainH(x,z+30)-terrainH(x,z-30))/60;const nl=Math.hypot(gx,1,gz);const sh=(-gx*-0.72+1*0.5+-gz*-0.1)/(nl*Math.hypot(0.72,0.5,0.1));tmp.multiplyScalar(0.62+0.55*clamp(sh,0,1.1));}
+    col[i*3]=tmp.r;col[i*3+1]=tmp.g;col[i*3+2]=tmp.b;}
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();
-  const gMat=new THREE.MeshLambertMaterial({map:grassMap,vertexColors:true});upgradeMap(gMat,'assets/grass_detail_512.jpg',new THREE.Vector2(600,600));const ground=new THREE.Mesh(geo,gMat);ground.receiveShadow=true;scene.add(ground);}
+  const gMat=new THREE.MeshLambertMaterial({map:grassMap,vertexColors:true});
+  /* two-scale ground shading: the fine grass detail is softened so its tiling never reads as a grid, and a large noise
+     texture (about 600 m per repeat) breaks the ground into fields, scrub and bare patches */
+  const macro=(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');const im=g.createImageData(256,256);
+    for(let y=0;y<256;y++)for(let x=0;x<256;x++){const v=fbm(x/26,y/26)*0.75+fbm(x/7+40,y/7)*0.25;const k=(0.72+v*0.5)*255;const i=(y*256+x)*4;im.data[i]=k;im.data[i+1]=k*(0.97+0.06*fbm(x/40,y/40+9));im.data[i+2]=k*0.95;im.data[i+3]=255;}
+    g.putImageData(im,0,0);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})();
+  gMat.onBeforeCompile=sh=>{sh.uniforms.macroMap={value:macro};sh.fragmentShader='uniform sampler2D macroMap;\n'+sh.fragmentShader.replace('#include <map_fragment>',
+    '#ifdef USE_MAP\n vec4 texelColor=texture2D(map,vUv);texelColor=mapTexelToLinear(texelColor);diffuseColor.rgb*=mix(vec3(0.8),texelColor.rgb*1.25,0.45);\n diffuseColor.rgb*=texture2D(macroMap,vUv*0.0019).rgb*1.05;\n#endif');};upgradeMap(gMat,'assets/grass_detail_512.jpg',new THREE.Vector2(600,600));const ground=new THREE.Mesh(geo,gMat);ground.receiveShadow=true;scene.add(ground);}
+/* lakes: one quad per water cell at that lake's level, merged into a single mesh */
+{const n=MAP.n,s=MAP.size,c=s/(n-1);const P=[];for(let j=0;j<n;j++)for(let i=0;i<n;i++){const k=j*n+i;if(!MAP.W[k])continue;const L=MAP.L[k],x=-s/2+i*c,z=-s/2+j*c,h=c*0.55;
+    P.push(x-h,L,z-h, x-h,L,z+h, x+h,L,z+h, x-h,L,z-h, x+h,L,z+h, x+h,L,z-h);}
+  if(P.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.computeVertexNormals();
+    const water=new THREE.Mesh(g,new THREE.MeshPhongMaterial({color:0x2c5363,specular:0x6f8fa0,shininess:90,transparent:true,opacity:0.92}));water.receiveShadow=true;scene.add(water);}}
 // mowed field with stripes, then the strip
 {const c=document.createElement('canvas');c.width=64;c.height=512;const g=c.getContext('2d');for(let i=0;i<8;i++){g.fillStyle=i%2?'#86a95e':'#7a9c53';g.fillRect(0,i*64,64,64);}const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(1,3);
   const fMat=new THREE.MeshLambertMaterial({color:0x8fae63});upgradeMap(fMat,'assets/field_grass_512.jpg',new THREE.Vector2(30,42));const base=new THREE.Mesh(new THREE.PlaneGeometry(150,210),fMat);base.rotation.x=-Math.PI/2;base.position.set(0,0.004,-25);base.receiveShadow=true;scene.add(base);
@@ -68,7 +88,7 @@ function frondTex(){const c=document.createElement('canvas');c.width=256;c.heigh
   const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;}
 const palms=[],rubbers=[];
 function okSpot(x,z){if(Math.abs(x)<14&&z>-85&&z<35)return false;if(x>-26&&x<36&&z>-6&&z<28)return false;if(z>-2&&z<12&&Math.abs(x)<30)return false;return true;}
-for(let i=0;i<(MOBILE?70:110);i++){const a=rnd()*Math.PI*2,d=55+rnd()*260;const x=Math.cos(a)*d,z=-20+Math.sin(a)*d;if(!okSpot(x,z))continue;(rnd()<0.55?palms:rubbers).push({x,z,h:rnd()});}
+for(let i=0;i<(MOBILE?70:110);i++){const a=rnd()*Math.PI*2,d=55+rnd()*260;const x=Math.cos(a)*d,z=-20+Math.sin(a)*d;if(!okSpot(x,z))continue;(rnd()<(DECCAN?0.25:0.55)?palms:rubbers).push({x,z,h:rnd()});}
 for(let i=0;i<12;i++)palms.push({x:-32+rnd()*5,z:-90+i*10,h:rnd()});   // palm row along the west boundary, the one to clear on takeoff
 for(let i=0;i<6;i++)palms.push({x:30+rnd()*6,z:22+rnd()*12,h:rnd()});
 { // palms
@@ -76,24 +96,32 @@ for(let i=0;i<6;i++)palms.push({x:30+rnd()*6,z:22+rnd()*12,h:rnd()});
   const frGeo=new THREE.PlaneGeometry(3.2,0.8,8,1);frGeo.translate(1.6,0,0);{const p=frGeo.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i);p.setZ(i,y);p.setY(i,-0.09*x*x+0.3*x);}frGeo.computeVertexNormals();}
   const frMat=new THREE.MeshLambertMaterial({map:frondTex(),alphaTest:0.35,side:THREE.DoubleSide});
   const trunks=new THREE.InstancedMesh(trunkGeo,lam(0x6b5a45),palms.length);const fronds=new THREE.InstancedMesh(frGeo,frMat,palms.length*10);
-  palms.forEach((P,i)=>{const h=8+P.h*7,tx=(rnd()-0.5)*0.25,tz=(rnd()-0.5)*0.25;_e.set(tx,0,tz);_q.setFromEuler(_e);_m.compose(_p.set(P.x,0,P.z),_q,_s.set(1,h,1));trunks.setMatrixAt(i,_m);
-    const top=new THREE.Vector3(0,h,0).applyQuaternion(_q).add(_p.set(P.x,0,P.z));
+  palms.forEach((P,i)=>{const g0=terrainH(P.x,P.z),h=(DECCAN?10:8)+P.h*7,tx=(rnd()-0.5)*0.25,tz=(rnd()-0.5)*0.25;_e.set(tx,0,tz);_q.setFromEuler(_e);_m.compose(_p.set(P.x,g0,P.z),_q,_s.set(1,h,1));trunks.setMatrixAt(i,_m);
+    const top=new THREE.Vector3(0,h,0).applyQuaternion(_q).add(_p.set(P.x,g0,P.z));
     for(let k=0;k<10;k++){_e.set(0,k/10*Math.PI*2+rnd()*0.4,(rnd()-0.3)*0.5,'YZX');_q.setFromEuler(_e);_m.compose(top,_q,_s.setScalar(1.25+rnd()*0.45));fronds.setMatrixAt(i*10+k,_m);}
-    trees.push({x:P.x,z:P.z,r:2.2,h:h+1});});
+    trees.push({x:P.x,z:P.z,r:2.2,h:g0+h+1});});
   trunks.castShadow=fronds.castShadow=true;fronds.receiveShadow=true;scene.add(trunks,fronds);}
 { // rubber trees: tall thin trunk, dense rounded crown
   const tg=new THREE.CylinderGeometry(0.14,0.22,1,6);tg.translate(0,0.5,0);const cg=new THREE.IcosahedronGeometry(1,1);
   const trunks=new THREE.InstancedMesh(tg,lam(0x6a5a48),rubbers.length);const crowns=new THREE.InstancedMesh(cg,lam(0xffffff),rubbers.length*3);
-  rubbers.forEach((R,i)=>{const h=9+R.h*6;_m.compose(_p.set(R.x,0,R.z),_q.identity(),_s.set(1,h*0.7,1));trunks.setMatrixAt(i,_m);
-    for(let k=0;k<3;k++){const ox=(rnd()-0.5)*2.4,oz=(rnd()-0.5)*2.4,oy=h*0.62+k*1.2+rnd();_m.compose(_p.set(R.x+ox,oy,R.z+oz),_q.setFromEuler(_e.set(rnd(),rnd(),0)),_s.set(2.4+rnd(),1.8+rnd()*0.8,2.4+rnd()));crowns.setMatrixAt(i*3+k,_m);crowns.setColorAt(i*3+k,_c.setHSL(0.26+rnd()*0.05,0.42,0.22+rnd()*0.08));}
-    trees.push({x:R.x,z:R.z,r:3,h:h+2});});
+  rubbers.forEach((R,i)=>{const g0=terrainH(R.x,R.z),h=(DECCAN?6:9)+R.h*(DECCAN?4:6);_m.compose(_p.set(R.x,g0,R.z),_q.identity(),_s.set(1,h*0.7,1));trunks.setMatrixAt(i,_m);
+    for(let k=0;k<3;k++){const ox=(rnd()-0.5)*2.4,oz=(rnd()-0.5)*2.4,oy=g0+h*(DECCAN?0.7:0.62)+k*(DECCAN?0.7:1.2)+rnd();_m.compose(_p.set(R.x+ox,oy,R.z+oz),_q.setFromEuler(_e.set(rnd(),rnd(),0)),_s.set((DECCAN?3.2:2.4)+rnd(),(DECCAN?1.6:1.8)+rnd()*0.8,(DECCAN?3.2:2.4)+rnd()));crowns.setMatrixAt(i*3+k,_m);crowns.setColorAt(i*3+k,DECCAN?_c.setHSL(0.21+rnd()*0.04,0.36,0.2+rnd()*0.06):_c.setHSL(0.26+rnd()*0.05,0.42,0.22+rnd()*0.08));}
+    trees.push({x:R.x,z:R.z,r:DECCAN?3.6:3,h:g0+h+2});});
   trunks.castShadow=crowns.castShadow=true;crowns.receiveShadow=true;scene.add(trunks,crowns);}
 { // plantation rows on the hills: cheap, no shadows, fade into the haze
-  const N=MOBILE?900:1800;const g=new THREE.IcosahedronGeometry(1,0);const im=new THREE.InstancedMesh(g,lam(0xffffff),N);let n=0;
-  for(let t=0;t<N*4&&n<N;t++){const a=rnd()*Math.PI*2,d=420+rnd()*1100;const x=Math.round((Math.cos(a)*d)/9)*9,z=Math.round((-20+Math.sin(a)*d)/9)*9;const h=terrainH(x,z);if(h<2)continue;
-    _m.compose(_p.set(x+rnd(),h+4,z+rnd()),_q.identity(),_s.set(3.2,3.6+rnd()*1.5,3.2));im.setMatrixAt(n,_m);im.setColorAt(n,_c.setHSL(0.27,0.38,0.17+rnd()*0.06));n++;}
+  const N=DECCAN?(MOBILE?900:1800):(MOBILE?2200:4200);const g=new THREE.IcosahedronGeometry(1,0);const im=new THREE.InstancedMesh(g,lam(0xffffff),N);let n=0;
+  for(let t=0;t<N*4&&n<N;t++){const a=rnd()*Math.PI*2,d=DECCAN?420+rnd()*1100:340+Math.pow(rnd(),0.8)*2400;let x=Math.cos(a)*d,z=-20+Math.sin(a)*d;if(!DECCAN){x=Math.round(x/9)*9;z=Math.round(z/9)*9;}const h=terrainH(x,z);if((!DECCAN&&h<-2&&rnd()<0.7)||waterCell(x,z)>=0)continue;
+    _m.compose(_p.set(x+rnd(),h+(DECCAN?2.4:4),z+rnd()),_q.identity(),DECCAN?_s.set(2.6+rnd()*1.5,2+rnd()*1.2,2.6+rnd()*1.5):_s.set(3.2,3.6+rnd()*1.5,3.2));im.setMatrixAt(n,_m);im.setColorAt(n,DECCAN?_c.setHSL(0.19,0.3,0.2+rnd()*0.07):_c.setHSL(0.27,0.38,0.17+rnd()*0.06));n++;}
   im.count=n;scene.add(im);}
 
+/* Deccan granite: boulder clusters on the rises, the landform the Hyderabad plateau is known for */
+if(DECCAN){const N=MOBILE?260:520;const g=new THREE.DodecahedronGeometry(1,0);const im=new THREE.InstancedMesh(g,lam(0xffffff),N);let n=0;
+  for(let t=0;t<N*6&&n<N;t++){const a=rnd()*Math.PI*2,d=330+rnd()*1600;const cx=Math.cos(a)*d,cz=-20+Math.sin(a)*d;const h0=terrainH(cx,cz);if(waterCell(cx,cz)>=0)continue;
+    const sl=Math.hypot(terrainH(cx+20,cz)-h0,terrainH(cx,cz+20)-h0);if(sl<1.2&&rnd()<0.75)continue;
+    const k=2+Math.floor(rnd()*4);for(let b=0;b<k&&n<N;b++){const x=cx+(rnd()-0.5)*14,z=cz+(rnd()-0.5)*14,sc=1.5+rnd()*4.5;const y=terrainH(x,z)+sc*0.45;
+      _m.compose(_p.set(x,y,z),_q.setFromEuler(_e.set(rnd()*3,rnd()*3,rnd()*3)),_s.set(sc*(1+rnd()*0.5),sc*(0.7+rnd()*0.4),sc*(1+rnd()*0.4)));im.setMatrixAt(n,_m);im.setColorAt(n,_c.setHSL(0.05+rnd()*0.04,0.1+rnd()*0.08,0.27+rnd()*0.1));
+      trees.push({x,z,r:sc,h:y+sc*0.6});n++;}}
+  im.count=n;im.castShadow=true;im.receiveShadow=true;scene.add(im);}
 /* ---------- field furniture: flight line, pilot box, shed, canopy, car, pilot, windsock ---------- */
 const line=new THREE.Mesh(new THREE.BoxGeometry(44,0.02,0.06),lam(0xEDE8DC));line.position.set(0,0.4,2);scene.add(line);
 for(const x of [-22,-12,-3,9,20]){const p=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.8,6),lam(0xF26522));p.position.set(x,0.4,2);scene.add(p);}

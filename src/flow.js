@@ -145,6 +145,15 @@ function setMode(m){G.mode=m;document.querySelectorAll('[data-mode]').forEach(b=
 /* ---------- wiring ---------- */
 on('bFly',()=>{G.started=true;if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();if(MOBILE&&!pad)setSticks(true);G.preflight={ail:false,ele:false,rud:false,wind:false,thrUp:false};show('preCard');});
 on('bHangar',showHangar);
+/* flying sites and their airspace: switching site reloads the page so terrain, trees and water are rebuilt from the real data */
+function renderSites(){$('siteList').innerHTML=Object.keys(MAP_DATA).map(id=>{const M=MAPS_META[id]||{name:id,region:''};return `<button class="btn${id===MAP_ID?' cur':''}" data-site="${id}"><b>${M.name}</b><small>${id===MAP_ID?'Flying here':M.region}</small></button>`;}).join('');
+  const A=MAP.air,z=A.zone;const ceil=A.ceil?A.ceil+' m ('+(A.ceil===120?'400':'200')+' ft)':'not permitted without approval';
+  $('airBox').innerHTML=`<span class="zone z-${z}"><i></i>${z.toUpperCase()} ZONE · ceiling ${ceil}</span><span>${A.why} ${MAP.note||''}</span>
+    <table>${A.near.map(n=>`<tr><td>${n.name}</td><td><b>${n.km.toFixed(1)} km</b> to perimeter</td></tr>`).join('')}${A.bans.map(b=>`<tr><td>${b.name}</td><td><b>${b.km.toFixed(1)} km</b> (ban ${b.r} km)</td></tr>`).join('')}</table>
+    <small>Strip at ${MAP.lat.toFixed(4)}, ${MAP.lon.toFixed(4)}, ${Math.round(MAP.elev)} m above sea level. Terrain from SRTM/NASADEM elevation data. Zones follow the Drone Rules 2021 airspace bands with airport perimeters estimated from runway positions, so distances are approximate. Before flying for real, check the official airspace map on Digital Sky (digitalsky.dgca.gov.in).</small>`;}
+$('fieldCard').addEventListener('click',e=>{const b=e.target.closest('[data-site]');if(!b||b.dataset.site===MAP_ID)return;settings.map=b.dataset.site;saveSettings();location.reload();});
+on('bMenuField',renderSites);
+{const sf=$('sField');if(sf)sf.textContent=MAP.short;const ss=$('sSite');if(ss)ss.textContent=MAP.name;const sz=$('sZone');if(sz)sz.textContent=MAP.air.zone[0].toUpperCase()+MAP.air.zone.slice(1)+' '+(MAP.air.ceil||0)+' m';}
 /* test code: ROVEARANGE adds 1,000,000 credits so every aircraft and upgrade can be tried */
 on('bHgCode',()=>{const c=($('hgCode').value||'').trim().toUpperCase();$('hgCode').value='';$('hgCode').blur();
   if(c==='ROVEARANGE'){career.credits+=1000000;saveCareer();renderHangar();$('hgHint').textContent='Code accepted: 1,000,000 credits added.';chime();}else $('hgHint').textContent='That code is not valid.';});on('bMulti',showMulti);on('bMpBack',()=>back());on('bMpFly',()=>{if(G.mode==='pursuit')G.mode='free';$('bFly').click();});

@@ -12,7 +12,7 @@ function mpSanitize(t,n){return String(t||'').replace(/[^A-Za-z0-9 _-]/g,'').tri
 async function mpJoin(room,name){room=mpSanitize(room,16).toUpperCase()||'KURIANAD';name=mpSanitize(name,14)||'Pilot';if(MP.on)await mpLeave();
   MP.room=room;MP.name=name;MP.status='connecting';MP.err='';renderMulti();store.set('jgsim.mp',{room,name});
   try{await mpLoadLib();if(!MP.client)MP.client=window.supabase.createClient(MP_URL,MP_KEY,{realtime:{params:{eventsPerSecond:12}}});
-    const ch=MP.client.channel('jg-room-'+room,{config:{broadcast:{self:false,ack:false},presence:{key:MP.id}}});MP.ch=ch;
+    const ch=MP.client.channel('jg-room-'+MAP_ID+'-'+room,{config:{broadcast:{self:false,ack:false},presence:{key:MP.id}}});MP.ch=ch;
     ch.on('broadcast',{event:'s'},({payload})=>mpOnState(payload));
     ch.on('presence',{event:'sync'},()=>mpSync(ch.presenceState()));
     ch.subscribe(async status=>{if(status==='SUBSCRIBED'){MP.on=true;MP.status='in';await ch.track(mpMe());say('Joined room '+room+' as '+name+'.','good');renderMulti();}

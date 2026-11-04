@@ -1,7 +1,7 @@
 {
   "name": "flightsimulator",
   "productName": "JG RoveaRange",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "JG RoveaRange: Flight Simulator. Jinu's Garage RC flight simulator, FlySky sim-cable ready.",
   "main": "electron/main.js",
   "author": "Jinu's Garage",

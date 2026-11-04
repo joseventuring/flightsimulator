@@ -142,3 +142,12 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Career guidance: on-screen markers for each Warden (blue, red when it sees you, with distance; edge arrows when off-screen), a green COVER marker at the nearest spot behind a tree or hill the Warden cannot see through (same line-of-sight test the Wardens use), and a status line (SEEN at N m / HIDDEN). Chapter 1 brief explains them.
 - Hangar code ROVEARANGE adds 1,000,000 credits for testing. Text boxes release keyboard focus when the screen changes (a focused box swallowed the flight keys).
 - Tests: test/heli.test.js added to npm test (fleet, quad, VTOL, helicopter, battery all pass); browser regressions pass.
+
+## v0.12 (4 Nov 2026): real-terrain maps and real airspace
+
+- Two public maps from open elevation data (SRTM/NASADEM/Copernicus via AWS Terrain Tiles), baked by tools/build_map.py: Kurianad (Kottayam, Kerala) and Moinabad (near Chilkur, Hyderabad). Lakes detected as dead-flat surfaces in the elevation data: Himayat Sagar (533 m) and Osman Sagar (542 m) at their real shorelines. A third map near a private location is kept out of the public build.
+- Strip placement: flattest open ground near the requested point, never on water (dead-flat rejected) and above reservoir full-tank level. Caught during the build: the first Moinabad site was on Osman Sagar's dry bed.
+- Physics: wheels, skids and crash points use the real ground height (valleys no longer have an invisible floor). Ceiling checks use height above the ground under the aircraft.
+- Airspace: Drone Rules 2021 bands against estimated airport perimeters (OurAirports runways plus a land buffer), police no-fly circles, and a 1 km safety margin on the 12 km line. Kurianad green 120 m (Kochi naval air station 36 km, Cochin International 44 km); Moinabad green 120 m (RGIA 16 km, Begumpet 21 km). Shown in Field and feel and enforced by the marshal.
+- Visuals: Kerala greens and a dry Deccan palette, baked hillshade, two-scale ground shading (no tiling grid), 4 to 5 km visibility, logarithmic depth (no field flicker), denser Kerala tree cover, Deccan granite boulders, neem and toddy palms.
+- Multiplayer rooms are per map.

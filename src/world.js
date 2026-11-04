@@ -22,6 +22,8 @@ const env={wind:wind.vec,rho:1.18,surfaceAt:(x,z)=>(Math.abs(x)<3.5&&z<20&&z>-70
 /* ---------- field marshal ---------- */
 const MSG=[];const cool={};
 function say(text,kind,key,cd){const now=st.time;if(key){if(cool[key]&&now-cool[key]<(cd||10))return;cool[key]=now;}MSG.push({t:now,text,kind:kind||''});if(MSG.length>3)MSG.shift();renderMarshal();}
+/* messages fade after a few seconds so the sky stays clear (sooner on a phone screen) */
+function ageMarshal(){const life=MOBILE?6:12;const n=MSG.length;while(MSG.length&&st.time-MSG[0].t>life)MSG.shift();if(MSG.length!==n)renderMarshal();}
 function renderMarshal(){$('marshal').innerHTML=MSG.map(m=>`<div class="m ${m.kind}"><b>${fmtTime(m.t)}</b> ${m.text}</div>`).join('');}
 function violation(text,key){if(cool['v'+key]&&st.time-cool['v'+key]<8)return;cool['v'+key]=st.time;G.viol++;logbook.violations++;save();say(text,'bad');}
 function marshal(){

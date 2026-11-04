@@ -28,7 +28,7 @@ function thrustFactor(P,u){if(P.edf){const x=Math.max(u,0)/P.Vpitch,s=Math.sqrt(
 function create(){
   return {pos:new V3(0,AC.spawnY||0.11,0),gearPos:0,vel:new V3(),q:new THREE.Quaternion().setFromAxisAngle(new V3(1,0,0),AC.spawnPitch===undefined?0.15:AC.spawnPitch),w:new V3(),
     thr:0,T:0,time:0,usedAh:0,volt:AC.cells*4.2,amp:0,soc:1,onGround:true,airborne:false,alpha:0,beta:0,V:0,nz:1,stall:0,
-    touchdown:null,maxV:0,maxAlt:0,trans:0,liftAuth:0,liftT:0,lift:0,mT:[0,0,0,0],iw:new V3(),air:false,turtleT:0,motor:[0,0,0,0],wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
+    touchdown:null,maxV:0,maxAlt:0,trans:0,liftAuth:0,rotorW:0,vi:0,spool:0,disc:new V3(),govI:0,collective:0,liftT:0,lift:0,mT:[0,0,0,0],iw:new V3(),air:false,turtleT:0,motor:[0,0,0,0],wheelN:[0,0,0],propAngle:0,stallSeed:Math.random()*6.28,surf:'strip',vsi:0};
 }
 // scratch
 const _qi=new THREE.Quaternion(),_va=new V3(),_vb=new V3(),_F=new V3(),_tq=new V3(),_pw=new V3(),_ww=new V3(),_rw=new V3(),_vw=new V3(),
@@ -36,6 +36,7 @@ const _qi=new THREE.Quaternion(),_va=new V3(),_vb=new V3(),_F=new V3(),_tq=new V
 /* inp: {ail,ele,rud:-1..1, thr:0..1}; env: {wind:V3 world, rho, surfaceAt(x,z)->'strip'|'grass'} ; returns crash reason or null */
 function step(st,inp,dt,env){
   if(AC.kind==='quad')return stepQuad(st,inp,dt,env);
+  if(AC.kind==='heli')return stepHeli(st,inp,dt,env);
   st.time+=dt;
   const rho=env.rho||1.18;
   _qi.copy(st.q).invert();
@@ -211,6 +212,83 @@ function vtolLift(st,inp,dt,V,rho){const Tm=AC.liftTmax/4,J=[AC.Ipitch,AC.Iyaw,A
   /* lift thrust acts along body up at the motor positions, slightly above the CG */
   _fb.set(0,Ts,0).applyQuaternion(st.q);_F.add(_fb);_tq.x+=Lx;_tq.y+=Ly;_tq.z+=Lz;
   const Il=AC.liftImax*pw;st.liftT=Ts;st.amp+=Il;st.lift=pw;st.usedAh+=Il*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);}
+
+/* ---------- collective-pitch helicopter (700 class) ----------
+   Main rotor: blade-element thrust with momentum inflow (Glauert, so forward speed adds lift: translational lift),
+   induced plus profile power, rotor inertia, a governor holding headspeed against a motor power limit.
+   Throttle cut is throttle hold: no motor torque, and with negative collective the airflow up through the disc keeps
+   the rotor turning (autorotation); pulling collective at the bottom trades rotor energy for a soft landing.
+   Tail rotor is geared to the main rotor and run by a heading-hold gyro. Cyclic tilts the disc with a short flapping lag;
+   the flybarless controller turns stick rates (Acro), or angles (Angle / Horizon), into cyclic. Rotor turns clockwise
+   from above, so the motor's reaction tries to yaw the nose left. */
+const _n=new V3(),_hb=new V3();
+function stepHeli(st,inp,dt,env){
+  st.time+=dt;const rho=env.rho||1.18,R=AC.rotorR,A=Math.PI*R*R,W0=AC.headspeed,J=[AC.Ipitch,AC.Iyaw,AC.Iroll];
+  _qi.copy(st.q).invert();_va.copy(st.vel).sub(env.wind);const V=_va.length();_vb.copy(_va).applyQuaternion(_qi);
+  const armed=inp.arm!==false,thr=clamp(inp.thr,0,1);
+  /* collective curve: -6 deg at the bottom of the stick, +12 at the top (hover sits near mid stick) */
+  const coll=(AC.collMin+(AC.collMax-AC.collMin)*thr)*Math.PI/180;st.collective=coll;
+  /* soft start: the governor ramps headspeed up over spoolTime once armed */
+  if(armed)st.spool=Math.min(1,st.spool+dt/AC.spoolTime);
+  const Wt=W0*st.spool,Wr=Math.max(st.rotorW,1),k2=(st.rotorW/W0)*(st.rotorW/W0);
+  /* disc normal in body axes from the tilt state: beta.z forward tilt, beta.x right tilt */
+  _n.set(st.disc.x,1,-st.disc.z).normalize();
+  const vc=_vb.dot(_n),vperp=Math.sqrt(Math.max(0,_vb.lengthSq()-vc*vc)),OR=Math.max(st.rotorW*R,1);
+  let T=0;for(let k=0;k<3;k++){const lam=(vc+st.vi)/OR;const ct=AC.sigma*AC.cla/4*0.95*(2/3*coll-lam);T=ct*rho*A*OR*OR;
+    const vin=T/(2*rho*A*Math.sqrt(vperp*vperp+(vc+st.vi)*(vc+st.vi)+0.25));st.vi+=(vin-st.vi)*0.5;}
+  const mu=vperp/OR,Pi=T*(vc+st.vi)*(T*(vc+st.vi)>0?1.15:1),P0=AC.sigma*AC.cd0/8*rho*A*OR*OR*OR*(1+4.6*mu*mu);
+  const Qa=(Pi+P0)/Wr;
+  /* tail rotor and heading-hold gyro: thrust sideways at the boom end, authority falls with headspeed squared */
+  const wyD=-inp.rud*AC.yawMax*0.0175,ey=wyD-st.w.y;if(!st.onGround)st.iw.y=clamp(st.iw.y+ey*dt,-0.6,0.6);else st.iw.y*=0.9;
+  /* governor: PI on headspeed with the aero torque fed forward, capped by motor power */
+  const eW=Wt-st.rotorW;st.govI=clamp(st.govI+eW*dt,-50,50);
+  let Qm=armed&&st.spool>0?AC.Irotor*(AC.govP*eW+AC.govI*st.govI)+Qa*1.08:0;Qm=clamp(Qm,0,AC.Pmax/Math.max(st.rotorW,25));
+  const tyNeed=J[1]*(AC.kPy*ey+AC.kI*st.iw.y);const Ftr=clamp((tyNeed-Qm)/AC.tailL,-AC.tailTmax*k2,AC.tailTmax*k2);
+  const Ptail=Math.abs(Ftr)*Math.sqrt(Math.abs(Ftr)/(2*rho*0.05))*1.3;
+  st.rotorW=Math.max(0,st.rotorW+(Qm-Qa-Ptail/Wr-0.02*st.rotorW*0.01)/AC.Irotor*dt);
+  /* flybarless controller: rate PID (Acro), or angle commands (Angle, Horizon), into a disc tilt */
+  const mode=inp.mode|0;let wx=rateCurve(inp.ele,AC.rateMax),wz=-rateCurve(inp.ail,AC.rateMax);
+  /* translating tendency: the tail rotor pushes sideways, so level for a helicopter is one skid low; the self-level target includes that roll */
+  const trimR=Math.abs(T)>5?clamp(Math.atan2(-st.tail||0,T)*57.3/AC.maxAngle,-0.3,0.3):0;
+  if(mode>0){const [ax,az]=angleCmd(st,clamp(inp.ail+trimR,-1,1),inp.ele,AC.maxAngle,AC.kAngle,AC.rateMax);if(mode===2){wx=ax;wz=az;}else{const h=Math.min(1,Math.max(Math.abs(inp.ail),Math.abs(inp.ele)))**2;wx=ax*(1-h)+wx*h;wz=az*(1-h)+wz*h;}}
+  const ex=wx-st.w.x,ez=wz-st.w.z;if(!st.onGround){st.iw.x=clamp(st.iw.x+ex*dt,-0.6,0.6);st.iw.z=clamp(st.iw.z+ez*dt,-0.6,0.6);}else{st.iw.x*=0.9;st.iw.z*=0.9;}
+  const tx=J[0]*(AC.kP*ex+AC.kI*st.iw.x),tz=J[2]*(AC.kP*ez+AC.kI*st.iw.z);
+  const stiff=AC.hubK*k2+Math.abs(T)*AC.hubH+1e-3;const cmax=AC.cyclicMax*Math.PI/180;
+  /* flapback: the advancing blade lifts more, so forward speed tilts the disc back (speed stability the FBL works against) */
+    const bzC=clamp(-tx/stiff,-cmax,cmax)+AC.flapback*_vb.z,bxC=clamp(-tz/stiff,-cmax,cmax)-AC.flapback*_vb.x;
+  const fl=1-Math.exp(-dt/AC.flapTau);st.disc.z+=(bzC-st.disc.z)*fl;st.disc.x+=(bxC-st.disc.x)*fl;
+  /* forces in body axes: rotor thrust along the disc, rotor H-drag, fuselage drag, tail rotor */
+  const sp=Math.hypot(_vb.x,_vb.z);
+  _fb.copy(_n).multiplyScalar(T);
+  _fb.x+=-AC.kH*Math.abs(T)*_vb.x-0.5*rho*AC.CdA[0]*V*_vb.x+Ftr;_fb.y+=-0.5*rho*AC.CdA[1]*V*_vb.y;_fb.z+=-AC.kH*Math.abs(T)*_vb.z-0.5*rho*AC.CdA[2]*V*_vb.z;
+  _F.copy(_fb).applyQuaternion(st.q);_F.y-=AC.mass*AC.g;
+  /* moments: thrust through the hub above the CG, hub stiffness, motor reaction, tail rotor, rotor damping */
+  _hb.copy(_n).multiplyScalar(T);const h=AC.hubH;
+  _tq.set(h*_hb.z-AC.hubK*k2*st.disc.z-AC.rotDamp*k2*st.w.x, Qm+AC.tailL*Ftr-0.05*st.w.y, -h*_hb.x-AC.hubK*k2*st.disc.x-AC.rotDamp*k2*st.w.z);
+  /* power and battery */
+  const Pm=Qm*st.rotorW/AC.motorEff;st.amp=0.5+Pm/Math.max(st.volt,1);st.usedAh+=st.amp*dt/3600;st.soc=1-st.usedAh/AC.capAh;st.volt=AC.cells*(ocv(st.soc)-st.amp*AC.rCell);
+  /* ground: skid contact points; blade strike if it tips with the rotor turning, hard landings, tail strikes */
+  let contact=false,hit=0,hitH=0,crash=null;
+  for(const p of AC.contacts){_pw.copy(p).applyQuaternion(st.q).add(st.pos);const pen=-_pw.y;if(pen<=0)continue;
+    _ww.copy(st.w).applyQuaternion(st.q);_rw.copy(p).applyQuaternion(st.q);_cv.copy(_ww).cross(_rw).add(st.vel);
+    let N=AC.kWheel*pen-AC.cWheel*_cv.y;if(N<0)N=0;const vt=Math.hypot(_cv.x,_cv.z);
+    _Fw.set(0,N,0);if(vt>1e-4){const f=Math.min(0.5*N,AC.mass*vt/dt*0.25);_Fw.x-=f*_cv.x/vt;_Fw.z-=f*_cv.z/vt;}
+    _F.add(_Fw);_Fb.copy(_Fw).applyQuaternion(_qi);_tq.add(_rxF.copy(p).cross(_Fb));contact=true;if(-_cv.y>hit)hit=-_cv.y;if(vt>hitH)hitH=vt;}
+  _u.set(0,1,0).applyQuaternion(st.q);
+  if(contact&&!st.onGround&&st.airborne){st.touchdown={sink:hit,speed:V,t:st.time};
+    if(hit>3.2)crash='Hard landing at '+hit.toFixed(1)+' m/s. The skids spread and the blades hit.';else if(hitH>6)crash='Skids caught the ground at '+(hitH*3.6).toFixed(0)+' km/h and it rolled over.';}
+  if(contact&&_u.y<0.55&&st.rotorW>0.3*W0&&st.time>1)crash=crash||'Blade strike. It tipped over with the rotor turning.';
+  st.onGround=contact;if(!contact&&st.pos.y>0.6)st.airborne=true;
+  st.nz=_fb.y/(AC.mass*AC.g);st.wheelN=[0,0,0];
+  /* integrate */
+  st.vel.addScaledVector(_F,dt/AC.mass);st.pos.addScaledVector(st.vel,dt);
+  _Iw.set(J[0]*st.w.x,J[1]*st.w.y,J[2]*st.w.z);_gy.copy(st.w).cross(_Iw);
+  st.w.x+=(_tq.x-_gy.x)/J[0]*dt;st.w.y+=(_tq.y-_gy.y)/J[1]*dt;st.w.z+=(_tq.z-_gy.z)/J[2]*dt;st.w.clampLength(0,30);
+  const ang=st.w.length()*dt;if(ang>0){_dq.setFromAxisAngle(_ax.copy(st.w).normalize(),ang);st.q.multiply(_dq).normalize();}
+  st.T=T;st.thr=st.rotorW/W0;st.V=V;st.alpha=0;st.stall=0;st.vsi=st.vel.y;st.surf='strip';st.tail=Ftr;st.Pm=Pm;
+  if(V>st.maxV)st.maxV=V;if(st.pos.y>st.maxAlt)st.maxAlt=st.pos.y;st.propAngle+=st.rotorW*dt;
+  return crash;
+}
 function rateCurve(s,max){const a=Math.abs(s);return Math.sign(s)*(AC.rateC*a+(max-AC.rateC)*a*a*a)*Math.PI/180;}
 function stepQuad(st,inp,dt,env){
   st.time+=dt;const rho=env.rho||1.18,a=AC.arm,Tm=AC.Tmax/4,J=[AC.Ipitch,AC.Iyaw,AC.Iroll];

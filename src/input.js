@@ -44,7 +44,7 @@ function showPad(){const el=$('txState');if(!el)return;const n=stickCount();if(p
 /* keyboard */
 const keys={};let kThr=0;
 window.addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;keys[e.code]=true;
-  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyV')toggleVtol();if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
+  if(e.code==='KeyR')reset();if(e.code==='KeyC')cycleCam();if(e.code==='KeyL')G.kRates=!G.kRates;if(e.code==='KeyT')cycleTelemetry();if(e.code==='KeyG')G.kStab=(G.kStab+1)%3;if(e.code==='KeyU')toggleGear();if(e.code==='KeyV')toggleVtol();if(e.code==='KeyH'){G.kHold=!G.kHold;}if(e.code==='KeyF')cycleFlaps();if(e.code==='KeyP'||e.code==='Escape')togglePause();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();});
 window.addEventListener('keyup',e=>{keys[e.code]=false;});
 
@@ -64,7 +64,7 @@ function setSticks(on){settings.sticks=on;document.body.classList.toggle('touch'
 
 /* flight controller mixer (like a trainer receiver gyro): Off / Assist (rate damping) / Self-level (attitude hold, 45° bank limit) */
 function stabMix(a,e,r){
-  const mode=G.stab; if(AC.kind==='quad'||(AC.kind==='vtol'&&st.liftAuth>0)||mode===0||!st.airborne||st.onGround)return [a,e,r];
+  const mode=G.stab; if(AC.kind==='quad'||AC.kind==='heli'||(AC.kind==='vtol'&&st.liftAuth>0)||mode===0||!st.airborne||st.onGround)return [a,e,r];
   const p=-st.w.z, q=st.w.x, yaw=-st.w.y;
   if(mode===1){return [clamp(a-0.06*p,-1,1),clamp(e-0.05*q,-1,1),clamp(r-0.04*yaw,-1,1)];}
   const att=attitude();const roll=-att.roll, pitch=att.pitch; // attitude().roll is +left-wing-down (ADI convention); controls use +right
@@ -80,7 +80,7 @@ function readInput(){
   const hasPad=selectPad();
   if(hasPad&&stickCount()>0){const va=fnVal('ail'),ve=fnVal('ele'),vr=fnVal('rud'),vt=fnVal('thr');a=va;e=ve;r=vr;t=vt===null?null:(vt+1)/2;src='transmitter';}
   G.lowRate=G.kRates||swOn('rates');
-  G.cut=swOn('cut');
+  G.cut=swOn('cut')||!!G.kHold;
   const s3=sw3('stab');G.stab=s3>=0?s3:G.kStab;
   /* a mapped switch owns the function; without one, keys and the on-screen buttons toggle it */
   if(AC.features.flaps&&dev&&dev.map.flap&&dev.map.flap.src){const f=sw3('flap');if(f>=0)G.flapPos=f;}
@@ -112,7 +112,13 @@ function toggleGear(){if(!AC.features.gear)return;G.gearUp=!G.gearUp;if(G.flying
 function cycleFlaps(){if(!AC.features.flaps)return;G.flapPos=(G.flapPos+1)%3;if(G.flying)say(['Flaps up.','Flaps take-off.','Flaps landing.'][G.flapPos],'');syncFeatureButtons();}
 function toggleVtol(){if(!AC.features.vtol)return;G.vtolPlane=!G.vtolPlane;syncFeatureButtons();}
 /* announce the QuadPlane's transition states as they happen */
-function vtolWatch(){if(AC.kind!=='vtol'||!G.flying)return;const s=st.trans;if(s===vtolWatch.s)return;const p=vtolWatch.s;vtolWatch.s=s;
+/* helicopter: spool-up, low headspeed and throttle hold calls */
+function heliWatch(){if(AC.kind!=='heli'||!G.flying)return;const W0=AC.headspeed;
+  if(st.spool>0&&st.spool<1&&!heliWatch.sp){heliWatch.sp=1;say('Spooling up. Hold the skids down until full headspeed.','');}
+  if(st.rotorW>0.97*W0&&heliWatch.sp===1){heliWatch.sp=2;say('Headspeed '+Math.round(st.rotorW*60/6.283)+' rpm. Ready to lift.','good');}
+  if(G.cut&&st.airborne)say('Throttle hold. Lower the collective to keep the rotor turning, flare at the bottom.','warn','hold',12);
+  if(st.airborne&&!st.onGround&&st.rotorW<0.85*W0&&st.rotorW>0.2*W0)say('Low headspeed: '+Math.round(st.rotorW*60/6.283)+' rpm.','bad','lowrpm',4);}
+function vtolWatch(){heliWatch();if(AC.kind!=='vtol'||!G.flying)return;const s=st.trans;if(s===vtolWatch.s)return;const p=vtolWatch.s;vtolWatch.s=s;
   if(s===1)say('Transition. Lift motors holding height while airspeed builds.','');else if(s===2)say('Transition complete. Wing-borne, lift motors off.','good');
   else if(s===3)say('Back-transition. Pitching up to slow down.','');else if(s===0&&p!==undefined&&p!==0)say('Hovering. Throttle is lift.','good');}
 function syncFeatureButtons(){document.querySelectorAll('[data-vtol]').forEach(b=>{b.hidden=!AC.features.vtol;b.textContent=G.vtolPlane?'Plane mode':'Hover mode';b.classList.toggle('on',G.vtolPlane);});document.querySelectorAll('[data-gear]').forEach(b=>{b.hidden=!AC.features.gear;b.textContent=G.gearUp?'Gear up':'Gear down';b.classList.toggle('on',G.gearUp);});

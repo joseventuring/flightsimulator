@@ -4,7 +4,7 @@
    Rules, borrowed from NFS Most Wanted: a BUST meter fills while a Warden is close and can see you; a COOLDOWN meter fills while
    none can; if one spots you during cooldown it resets. HEAT rises the longer you run and brings faster Wardens, then a second one. */
 const CHAPTERS=[
-  {name:'Rookie at Kurianad',heat:1,goal:'escape',reward:400,brief:'A Coast Warden has your tail number. Lose it: break line of sight behind the palms or the ridge, or get more than 140 m away, and hold it until cooldown completes.'},
+  {name:'Rookie at Kurianad',heat:1,goal:'escape',reward:400,brief:'A Coast Warden has your tail number. The red marker shows where it is and how far. While it can see you the bust meter fills if it gets close. Fly to the green COVER marker: it is the nearest spot behind a tree or a hill the Warden cannot see through. Stay hidden until the cooldown bar fills.'},
   {name:'Monsoon run',heat:2,goal:'survive',time:90,reward:700,brief:'Two minutes of rain-season patrol. Survive 90 seconds without being busted, then escape. Heat 2 Wardens fly at 94 km/h.'},
   {name:'Ridge line',heat:3,goal:'escape',reward:1200,brief:'Two Wardens at heat 3. The hills to the north are your best cover. The Kestrel or the Talon will help here.'},
   {name:'Most wanted',heat:1,goal:'endless',reward:0,brief:'Free pursuit. Heat climbs every minute. Bank your bounty by escaping before you get busted.'},
@@ -25,7 +25,7 @@ function stopPursuit(){pursuit.active=false;clearWardens();}
 function updatePursuit(dt){
   if(!pursuit.active||!G.flying||G.paused)return;
   if(!pursuit.started){pursuit.air=(st.airborne&&!st.onGround)?(pursuit.air||0)+dt:0;if(pursuit.air>2){pursuit.started=true;const H=HEAT[pursuit.heat];for(let i=0;i<H.n;i++)spawnWarden(i);say('Coast Warden inbound. Heat '+pursuit.heat+'.','bad');haptic([40,30,40]);}return;}
-  pursuit.t+=dt;const ch=CHAPTERS[pursuit.chapter];
+  pursuit.t+=dt;const ch=CHAPTERS[pursuit.chapter];updateGuide(dt);
   if(ch.goal==='endless'&&pursuit.heat<3&&pursuit.t>60*pursuit.heat){pursuit.heat++;say('Heat '+pursuit.heat+'. Wardens are faster now.','bad');if(HEAT[pursuit.heat].n>wardens.length)spawnWarden(wardens.length);}
   const H=HEAT[pursuit.heat];let anySee=false,close=false;
   /* Wardens scale to the aircraft you fly: never slower than the heat level, and at least 90% of your top speed, so a jet still has to out-turn them */
@@ -62,6 +62,31 @@ function endPursuit(kind,why){const ch=CHAPTERS[pursuit.chapter];pursuit.result=
   $('purTime').textContent=fmtTime(pursuit.t);$('purBounty').textContent=Math.round(pursuit.bounty);$('purEarned').textContent=earned;$('purCredits').textContent=career.credits;
   G.flying=false;if(kind==='crash'){G.crashed=true;feedback('large',st.pos.x,Math.max(st.pos.y,0.05),st.pos.z);}
   setTimeout(()=>show('purCard'),kind==='crash'?700:200);}
+/* ---------- pursuit guidance: where the Wardens are, and where to hide ----------
+   Twice a second, look at nearby trees and hill points; a hiding spot is just behind one of them as seen from the Warden
+   that is watching you. Pick the closest spot the Warden really cannot see (same line-of-sight test the Wardens use). */
+const guide={t:0,cover:null,coverKind:'',hills:null};
+function hillPoints(){if(guide.hills)return guide.hills;const H=[];for(let a=0;a<64;a++){for(const r of [420,520,640]){const x=Math.cos(a/64*6.283)*r,z=-20+Math.sin(a/64*6.283)*r;const h=terrainH(x,z);if(h>14)H.push({x,z,h});}}guide.hills=H;return H;}
+const _cv2=new THREE.Vector3(),_hp=new THREE.Vector3();
+function updateGuide(dt){guide.t-=dt;if(guide.t>0)return;guide.t=0.5;guide.cover=null;
+  const W=wardens.filter(w=>w.sees).sort((a,b)=>a.pos.distanceTo(st.pos)-b.pos.distanceTo(st.pos))[0]||wardens.slice().sort((a,b)=>a.pos.distanceTo(st.pos)-b.pos.distanceTo(st.pos))[0];if(!W)return;
+  let best=null,bd=1e9;
+  const tryC=(x,z,top,r,kind)=>{const dx=x-W.pos.x,dz=z-W.pos.z,L=Math.hypot(dx,dz);if(L<30)return;
+    const off=r+6;_hp.set(x+dx/L*off,Math.max(3,Math.min(top*0.6,top-2)),z+dz/L*off);const d=_hp.distanceTo(st.pos);if(d>bd||d>450)return;if(lineOfSight(W.pos,_hp))return;bd=d;best={p:_hp.clone(),kind};};
+  const near=trees.map(T=>[T,(T.x-st.pos.x)**2+(T.z-st.pos.z)**2]).sort((a,b)=>a[1]-b[1]).slice(0,40);
+  near.forEach(([T])=>tryC(T.x,T.z,T.h,T.r,'tree'));hillPoints().forEach(P=>tryC(P.x,P.z,P.h,18,'hill'));
+  guide.cover=best;}
+/* screen markers: on-screen brackets, or an arrow on the screen edge when the target is off-screen or behind */
+const _pj=new THREE.Vector3();
+function placeMark(el,pos,label){const v=_pj.copy(pos).project(camera);let x=v.x,y=v.y;const behind=v.z>1;if(behind){x=-x;y=-y;}
+  const Wd=innerWidth,Hd=innerHeight,m=0.86;const off=behind||Math.abs(x)>m||Math.abs(y)>m;
+  if(off){const k=Math.max(Math.abs(x)/m,Math.abs(y)/m,1e-3);x/=k;y/=k;}
+  const sx=(x*0.5+0.5)*Wd,sy=(-y*0.5+0.5)*Hd;el.style.left=sx+'px';el.style.top=sy+'px';el.classList.toggle('edge',off);
+  el.querySelector('i').style.transform=off?'rotate('+(Math.atan2(-y,x)*57.3+90)+'deg)':'none';el.querySelector('b').textContent=label;el.hidden=false;}
+function drawPursuitMarks(){const box=$('purMarks');if(!box)return;const on=pursuit.active&&pursuit.started&&G.view==='fly';box.hidden=!on;if(!on)return;
+  while(box.children.length<wardens.length+1){const d=document.createElement('div');d.className='pm';d.innerHTML='<i></i><b></b>';box.appendChild(d);}
+  [...box.children].forEach((el,i)=>{if(i<wardens.length){const W=wardens[i];el.className='pm w'+(W.sees?' seen':'');placeMark(el,W.pos,(W.sees?'SEES YOU ':'WARDEN ')+Math.round(W.pos.distanceTo(st.pos))+' m');}
+    else if(i===wardens.length&&guide.cover&&wardens.some(W=>W.sees)){el.className='pm c';placeMark(el,guide.cover.p,'COVER '+Math.round(guide.cover.p.distanceTo(st.pos))+' m');}else el.hidden=true;});}
 function drawPursuitHud(){const box=$('purHud');const on=pursuit.active&&pursuit.started;document.body.classList.toggle('pursuing',on);if(!on){box.hidden=true;return;}box.hidden=false;
   $('purHeat').textContent='★'.repeat(pursuit.heat)+'☆'.repeat(3-pursuit.heat);$('purBust').style.width=(pursuit.bust*100)+'%';$('purCool').style.width=(pursuit.cool*100)+'%';
-  $('purB').textContent=Math.round(pursuit.bounty);const ch=CHAPTERS[pursuit.chapter];$('purGoal').textContent=ch.goal==='survive'&&pursuit.t<ch.time?'Survive '+Math.ceil(ch.time-pursuit.t)+' s':wardens.some(W=>W.sees)?'Break line of sight':'Hold it';}
+  $('purB').textContent=Math.round(pursuit.bounty);const ch=CHAPTERS[pursuit.chapter];$('purGoal').textContent=ch.goal==='survive'&&pursuit.t<ch.time?'Survive '+Math.ceil(ch.time-pursuit.t)+' s':(()=>{const s=wardens.filter(W=>W.sees);if(s.length){const d=Math.round(Math.min(...s.map(W=>W.pos.distanceTo(st.pos))));return 'SEEN at '+d+' m. Get behind the green cover marker';}return 'HIDDEN. Stay out of sight until cooldown fills';})();drawPursuitMarks();}

@@ -1,7 +1,7 @@
 {
   "name": "flightsimulator",
   "productName": "JG RoveaRange",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "JG RoveaRange: Flight Simulator. Jinu's Garage RC flight simulator, FlySky sim-cable ready.",
   "main": "electron/main.js",
   "author": "Jinu's Garage",
@@ -12,7 +12,7 @@
     "dist": "electron-builder --publish never",
     "release": "electron-builder --publish always",
     "build": "python3 build.py",
-    "test": "node test/physics.test.js all && node test/fleet.test.js && node test/quad.test.js && node test/vtol.test.js && node test/battery.test.js"
+    "test": "node test/physics.test.js all && node test/fleet.test.js && node test/quad.test.js && node test/vtol.test.js && node test/heli.test.js && node test/battery.test.js"
   },
   "devDependencies": {
     "electron": "33.2.0",

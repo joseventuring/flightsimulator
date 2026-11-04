@@ -1,12 +1,12 @@
 const on=(id,fn)=>{const el=$(id);if(el)el.addEventListener('click',fn);};
 const onAll=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener('click',fn));
 /* ---------- screens (game-ui-ux: a screen stack with Back, focus per screen) ---------- */
-const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard','winCard','logCard','pauseCard','fieldCard','careerCard','purCard'];
+const SCREENS=['menuCard','hangarCard','txCard','preCard','crashCard','landCard','winCard','logCard','pauseCard','fieldCard','careerCard','purCard','mpCard'];
 const SIDE=new Set(['hangarCard','txCard','preCard']);   // docked right, the aircraft stays visible
 let screenStack=[];
-function show(id,push){const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');document.body.classList.toggle('hg',id==='hangarCard');G.view=side?'hangar':'fly';
+function show(id,push){/* a text box left focused would swallow the flight keys */const ae=document.activeElement;if(ae&&ae.tagName==='INPUT')ae.blur();const ov=$('overlay');ov.hidden=false;SCREENS.forEach(c=>$(c).hidden=c!==id);const side=SIDE.has(id);ov.classList.toggle('side',side);ov.classList.toggle('left',id==='menuCard');document.body.classList.toggle('hangar',side);document.body.classList.toggle('in-menu',!side);document.body.classList.toggle('pre',id==='preCard');document.body.classList.toggle('hg',id==='hangarCard');G.view=side?'hangar':'fly';
   if(push!==false&&screenStack[screenStack.length-1]!==id)screenStack.push(id);const b=$(id).querySelector('.btn.primary')||$(id).querySelector('.btn');if(b&&!MOBILE)setTimeout(()=>b.focus({preventScroll:true}),30);$(id).scrollTop=0;if(id==='txCard')refreshTx();if(id==='menuCard')refreshMenu();if(id!=='hangarCard'&&!G.flying&&typeof loadedId!=='undefined'&&loadedId&&loadedId!==career.selected)loadPlayerAircraft(career.selected);}
-function hide(){$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre','hg');G.view='fly';screenStack=[];}
+function hide(){const ae=document.activeElement;if(ae&&ae.tagName==='INPUT')ae.blur();$('overlay').hidden=true;$('overlay').classList.remove('side','left');document.body.classList.remove('hangar','in-menu','pre','hg');G.view='fly';screenStack=[];}
 function back(){screenStack.pop();const prev=screenStack.pop();if(prev)show(prev);else if(G.paused)show('pauseCard');else if(G.landed)show('landCard');else if(G.crashed)show('crashCard');else if(G.flying)hide();else show('menuCard');}
 function togglePause(){if(!G.flying||G.crashed||G.landed)return;if(G.paused){G.paused=false;hide();last=performance.now();}else if($('overlay').hidden){G.paused=true;show('pauseCard');}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&G.flying&&!G.paused&&$('overlay').hidden&&!G.crashed&&!G.landed){G.paused=true;show('pauseCard');}});
@@ -15,7 +15,7 @@ function save(){store.set('jgsim.log',logbook);}
 function saveSettings(){store.set('jgsim.settings',settings);}
 function haptic(ms){try{if(settings.haptics&&navigator.vibrate)navigator.vibrate(ms);}catch(e){}}
 function reset(){
-  st=Sim.create();G.gearUp=false;G.flapPos=0;G.vtolPlane=false;vtolWatch.s=undefined;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
+  st=Sim.create();G.gearUp=false;G.flapPos=0;G.vtolPlane=false;G.kHold=false;vtolWatch.s=undefined;heliWatch.sp=0;syncFeatureButtons();G.crashed=false;G.landed=false;G.paused=false;G.trauma=0;G.viol=0;G.flightStart=0;G.lastGroundT=0;kThr=0;touch.l.y=-1;touch.l.place&&touch.l.place();
   MSG.length=0;for(const k in cool)delete cool[k];renderMarshal();
   gate.i=0;gate.running=false;gate.lastD=0;gateMeshes.forEach(m=>m.material=gateDim);if(gateMeshes[0])gateMeshes[0].material=gateM;
   gateObjs.forEach(g=>g.grp.visible=G.mode==='gates');$('gatebox').style.display=G.mode==='gates'?'flex':'none';
@@ -65,6 +65,8 @@ function updateMarker(){const d=camera.position.distanceTo(st.pos);const viewH=2
   marker.position.copy(st.pos);const sz=viewH*(MOBILE?0.075:0.055);marker.scale.set(sz,sz,1);
   marker.visible=G.flying&&G.view==='fly'&&G.cam==='pilot'&&modelFrac<0.06;marker.material.opacity=clamp((0.06-modelFrac)/0.03,0,0.85);}
 function updateCamera(dt){
+  /* the pilot figure stands where the pilot camera is; hide it in that view so it never clips into a low pass */
+  pilot.visible=!(G.cam==='pilot'&&G.view!=='hangar'&&(G.flying||G.crashed||G.landed));
   if(G.view==='hangar'||(!G.flying&&!G.crashed&&!G.landed)){hangarAngle+=dt*0.1;const a=0.75+Math.sin(hangarAngle)*0.55;const target=st.pos.clone().add(new THREE.Vector3(0,0.03,0.02));const sc=AC.kind==='quad'?0.5:Math.max(1,AC.span/0.8);const want=new THREE.Vector3(Math.sin(a)*1.35*sc,0.62*sc,Math.cos(a)*1.35*sc).add(target);camPos.lerp(want,1-Math.exp(-dt*3));camera.position.copy(camPos);camera.lookAt(target);camera.fov=40;const W=canvas.clientWidth,H=canvas.clientHeight;if(G.view==='hangar'&&W>700)camera.setViewOffset(W,H,W*0.22,0,W,H);else camera.clearViewOffset();camera.updateProjectionMatrix();return;}
   if(camera.view&&camera.view.enabled)camera.clearViewOffset();
   if(G.cam==='pilot'){camera.position.copy(PILOT_EYE);camLook.lerp(st.pos,1-Math.exp(-dt*12));camera.lookAt(camLook);
@@ -72,8 +74,9 @@ function updateCamera(dt){
        Model fills about 1/6 of the screen height when it can; the lens never goes narrower than 18 deg (phone) or 15 deg (desktop). */
     const d=PILOT_EYE.distanceTo(st.pos);const want=clamp(2*Math.atan(AC.span*6/2/Math.max(d,1))*57.3,MOBILE?18:15,MOBILE?55:50);
     camera.fov+=(want-camera.fov)*(1-Math.exp(-dt*3));camera.updateProjectionMatrix();}
-  else if(G.cam==='chase'){const cs=Math.max(1,AC.span/0.8);const cq=AC.kind==='quad'?headingQ():st.q;/* a quad flips; the chase camera follows its heading, not its attitude */const target=new THREE.Vector3(0,0.45*cs,2.0*cs).applyQuaternion(cq).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*(5+0.3*st.V)));camPos.y=Math.max(camPos.y,0.25);/* follow rate rises with speed so the trailing lag stays near 2 m on the jet too */camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(cq),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
+  else if(G.cam==='chase'){const cs=Math.max(1,AC.span/0.8);const cq=(AC.kind==='quad'||AC.kind==='heli')?headingQ():st.q;/* a quad flips; the chase camera follows its heading, not its attitude */const target=new THREE.Vector3(0,0.45*cs,2.0*cs).applyQuaternion(cq).add(st.pos);camPos.lerp(target,1-Math.exp(-dt*(5+0.3*st.V)));camPos.y=Math.max(camPos.y,0.25);/* follow rate rises with speed so the trailing lag stays near 2 m on the jet too */camera.position.copy(camPos);const lead=st.vel.clone().multiplyScalar(0.12);camera.lookAt(st.pos.clone().addScaledVector(FWD.clone().applyQuaternion(cq),2).add(lead));camera.fov=58;camera.updateProjectionMatrix();}
   else if(AC.kind==='quad'){/* FPV camera tilted up 25 deg, the usual freestyle angle: level hover looks at the ground, forward flight looks ahead */camera.position.copy(new THREE.Vector3(0,0.012,-0.07).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q).multiply(QUP);camera.fov=92;camera.updateProjectionMatrix();}
+  else if(AC.kind==='heli'){camera.position.copy(new THREE.Vector3(0,-0.02,-0.45).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=88;camera.updateProjectionMatrix();}
   else{camera.position.copy(new THREE.Vector3(0,0.1*Math.max(1,AC.span/0.8),-0.19*AIRCRAFT[loadedId].geom.k).applyQuaternion(st.q).add(st.pos));camera.quaternion.copy(st.q);camera.fov=85;camera.updateProjectionMatrix();}
   if(G.trauma>0&&!reduceMotion){G.trauma=Math.max(0,G.trauma-1.4*dt);const sh=G.trauma*G.trauma,t=performance.now()/1000*30;if(G.cam!=='pilot'){camera.rotation.z+=0.06*sh*Math.sin(t*1.1);camera.rotation.x+=0.03*sh*Math.sin(t*1.7);}else{camera.fov*=1+0.02*sh*Math.sin(t*1.3);camera.updateProjectionMatrix();}}
   const buffet=st.stall*0.004*(G.cam==='fpv'?1:0);if(buffet>0&&!reduceMotion){camera.rotation.z+=buffet*Math.sin(performance.now()/1000*40);}
@@ -84,13 +87,15 @@ function updatePreflight(){
   if($('preCard').hidden)return;
   const p=G.preflight;const n=stickCount();
   $('pf-tx-v').textContent=pad?(n===4?'4 sticks mapped':n+' of 4 mapped'):(settings.sticks?'touch sticks':'keyboard');$('pf-tx').classList.toggle('done',!pad||n===4);
-  $('pf-thr-v').textContent=Math.round(IN.rawThr*100)+'%';$('pf-thr').classList.toggle('done',IN.rawThr<0.05);
+  /* throttle check is active, like the stick checks: raise it, then bring it back to idle, so a reversed or dead throttle shows up before take-off */
+  if(IN.rawThr>0.2)p.thrUp=true;const thrOk=p.thrUp&&IN.rawThr<0.05;
+  $('pf-thr-v').textContent=p.thrUp?Math.round(IN.rawThr*100)+'%':'raise it';$('pf-thr').classList.toggle('done',thrOk);
   $('pf-cut').hidden=!(dev&&dev.map.cut.src);$('pf-cut').classList.toggle('done',!G.cut);$('pf-cut-v').textContent=G.cut?'ON, flip it off':'off';
   if(IN.rawAil>0.7)p.ail=true;if(IN.rawEle>0.7)p.ele=true;if(IN.rawRud>0.7)p.rud=true;
   $('pf-ail').classList.toggle('done',p.ail);$('pf-ele').classList.toggle('done',p.ele);$('pf-rud').classList.toggle('done',p.rud);
   $('pf-wind-v').textContent=settings.wdir+'° at '+settings.wind+' m/s, RWY 00';$('pf-wind').classList.toggle('done',p.wind);
-  const all=IN.rawThr<0.05&&!G.cut&&p.ail&&p.ele&&p.rud&&p.wind;$('bClear').disabled=!all;
-  $('pfWhy').textContent=all?(pad&&n<4?'Ready. '+(4-n)+' stick'+(4-n>1?'s are':' is')+' not on the transmitter yet and will use '+(settings.sticks?'touch':'the keyboard')+'.':'All checks done.'):G.cut?'Throttle cut is ON. Flip it off.':'Move each control fully, then tap Wind to confirm.';
+  const all=thrOk&&!G.cut&&p.ail&&p.ele&&p.rud&&p.wind;$('bClear').disabled=!all;
+  $('pfWhy').textContent=all?(pad&&n<4?'Ready. '+(4-n)+' stick'+(4-n>1?'s are':' is')+' not on the transmitter yet and will use '+(settings.sticks?'touch':'the keyboard')+'.':'All checks done.'):G.cut?'Throttle cut is ON. Flip it off.':!p.thrUp?'Raise the throttle, then bring it back to idle.':'Move each control fully, then tap Wind to confirm.';
 }
 $('pf-wind').addEventListener('click',()=>{G.preflight.wind=true;});
 
@@ -134,12 +139,16 @@ function applyTelemetry(){const m=settings.tele||'full';$('hud').classList.toggl
 function showLog(){const L=logbook;$('logStats').innerHTML=[['Flights',L.flights],['Airtime',fmtTime(L.airtime)],['Longest',fmtTime(L.longest)],['Greasers',L.landings],['Firm',L.firm],['Hard',L.hard],['Crashes',L.crashes],['Violations',L.violations],['Best course',L.bestGate===null?'none':L.bestGate.toFixed(1)+' s']].map(([k,v])=>`<div><span class="lbl">${k}</span><b>${v}</b></div>`).join('');show('logCard');}
 const STABN=['Stab off','Assist','Self-level'];
 function cycleStab(){if(dev&&dev.map.stab.src){say('Stabiliser is on a transmitter switch.','warn','stabsw',3);return;}G.kStab=(G.kStab+1)%3;settings.stab=G.kStab;saveSettings();applyStabLabel();}
-function applyStabLabel(){/* runs at start-up from the model loader too, so its label lists live inside it */const N=AC.kind==='quad'?['Acro','Horizon','Angle']:['Stab off','Assist','Self-level'];document.querySelectorAll('[data-stab]').forEach(b=>{b.textContent=N[G.stab];b.classList.toggle('on',G.stab>0);});}
+function applyStabLabel(){/* runs at start-up from the model loader too, so its label lists live inside it */const N=(AC.kind==='quad'||AC.kind==='heli')?['Acro','Horizon','Angle']:['Stab off','Assist','Self-level'];document.querySelectorAll('[data-stab]').forEach(b=>{b.textContent=N[G.stab];b.classList.toggle('on',G.stab>0);});}
 function setMode(m){G.mode=m;document.querySelectorAll('[data-mode]').forEach(b=>b.textContent=m==='free'?'Freefly':m==='gates'?'Gates':'Pursuit');reset();}
 
 /* ---------- wiring ---------- */
-on('bFly',()=>{G.started=true;if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();if(MOBILE&&!pad)setSticks(true);G.preflight={ail:false,ele:false,rud:false,wind:false};show('preCard');});
-on('bHangar',showHangar);on('bMenuTx',()=>openTx(false));on('bMenuLog',showLog);on('bMenuField',()=>show('fieldCard'));
+on('bFly',()=>{G.started=true;if(!audio)initAudio();if(audio&&audio.ctx.state==='suspended')audio.ctx.resume();if(MOBILE&&!pad)setSticks(true);G.preflight={ail:false,ele:false,rud:false,wind:false,thrUp:false};show('preCard');});
+on('bHangar',showHangar);
+/* test code: ROVEARANGE adds 1,000,000 credits so every aircraft and upgrade can be tried */
+on('bHgCode',()=>{const c=($('hgCode').value||'').trim().toUpperCase();$('hgCode').value='';$('hgCode').blur();
+  if(c==='ROVEARANGE'){career.credits+=1000000;saveCareer();renderHangar();$('hgHint').textContent='Code accepted: 1,000,000 credits added.';chime();}else $('hgHint').textContent='That code is not valid.';});on('bMulti',showMulti);on('bMpBack',()=>back());on('bMpFly',()=>{if(G.mode==='pursuit')G.mode='free';$('bFly').click();});
+on('bMpJoin',()=>{if(MP.on)mpLeave();else mpJoin($('mpRoom').value,$('mpName').value);});onAll('[data-mp]',showMulti);on('bMenuTx',()=>openTx(false));on('bMenuLog',showLog);on('bMenuField',()=>show('fieldCard'));
 on('bHangarBack',back);
 on('bTxWizard',()=>startWizard(0));on('bTxBack',()=>{wiz.on=false;swCap=null;$('wiz').hidden=true;back();});
 on('bClear',startFlight);on('bSkipPre',startFlight);on('bPreTx',()=>openTx(false));on('bPreBack',back);

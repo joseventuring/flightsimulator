@@ -60,6 +60,13 @@ const AIRCRAFT={
       features:{flaps:false,gear:false,vtol:true},
       wheels:[{p:V(-0.15,-0.14,0.05),r:0.03,steer:0},{p:V(0.15,-0.14,0.05),r:0.03,steer:0},{p:V(0,-0.145,-0.36),r:0.025,steer:-0.25}]},
     tail:[0.45,0.035],paint:{primary:'#F2EFE8',secondary:'#2F6B3A',accent:'#F26522'}},
+  rotor:{id:'rotor',name:'Rotor R-20',role:'Helicopter',kind:'heli',price:8000,blurb:'700 class collective-pitch 3D helicopter on 12S, 1.58 m rotor, governed at 2100 rpm. The throttle stick is collective pitch, the tail is on a heading-hold gyro. Wait for spool-up before lifting. Throttle hold (H, or the cut switch) cuts the motor: lower the collective, let it autorotate, flare at the bottom.',
+    geom:{heli:true,k:1,R:0.79},
+    phys:{name:'Rotor R-20',kind:'heli',mass:5.0,span:1.58,rotorR:0.79,headspeed:220,sigma:0.052,cla:5.7,cd0:0.009,collMin:-6,collMax:12,spoolTime:5,Irotor:0.08,govP:8,govI:4,Pmax:5000,motorEff:0.88,
+      tailL:0.95,tailTmax:40,hubK:80,hubH:0.25,flapback:0.0015,flapTau:0.035,rotDamp:0.8,cyclicMax:10,kH:0.004,CdA:[0.08,0.18,0.05],
+      Ipitch:0.55,Iroll:0.22,Iyaw:0.5,rateC:180,rateMax:380,yawMax:500,maxAngle:35,kAngle:5,kP:14,kPy:12,kI:6,cells:12,capAh:5.0,rCell:0.003,alarmV:3.5,KV:500,blades:2,kWheel:6000,cWheel:60,spawnY:0.303,
+      contacts:[{x:-0.13,y:-0.30,z:-0.25},{x:0.13,y:-0.30,z:-0.25},{x:-0.13,y:-0.30,z:0.20},{x:0.13,y:-0.30,z:0.20},{x:0,y:-0.08,z:1.15},{x:0,y:-0.16,z:1.12},{x:0,y:-0.12,z:-0.42},{x:0,y:0.30,z:0},{x:-0.12,y:0.05,z:0},{x:0.12,y:0.05,z:0}],features:{flaps:false,gear:false}},
+    paint:{primary:'#F5C542',secondary:'#1B222B',accent:'#E8503A'}},
   sprint:{id:'sprint',name:'Sprint Q-16',role:'FPV quad',kind:'quad',price:3500,blurb:'5 inch freestyle quad, 650 g on 6S, eight times more thrust than weight. Acro by default like a real FPV quad: the sticks set rotation rates and nothing levels it for you. Horizon and Angle are on the stabiliser button.',
     geom:{quad:true,k:1,arm:0.0795,propR:0.0635},
     phys:{name:'Sprint Q-16',kind:'quad',mass:0.65,span:0.225,arm:0.0795,Tmax:54,thrExp:1.6,Vpitch:48,motorTau:0.03,kQ:0.016,kH:0.006,CdA:[0.010,0.020,0.008],
@@ -98,7 +105,7 @@ function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wh
   const sc=A.phys.span/0.8;
   AC.crashPts=A.phys.crashPts?A.phys.crashPts.map(([n,p])=>[n,toV(p)]):AC_BASE.crashPts.map(([n,p])=>[n,new THREE.Vector3(p.x*sc,p.y,p.z*A.geom.k)]);
   AC.features=Object.assign({flaps:false,gear:false},A.phys.features||{});
-  if(AC.kind==='quad'){AC.contacts=A.phys.contacts.map(toV);AC.wheels=[];AC.crashPts=[];AC.spawnPitch=0;AC.spawnY=A.phys.spawnY;return;}
+  if(AC.kind==='quad'||AC.kind==='heli'){AC.contacts=A.phys.contacts.map(toV);AC.wheels=[];AC.crashPts=[];AC.spawnPitch=0;AC.spawnY=A.phys.spawnY;return;}
   /* resting attitude: the angle that puts the main wheels and the third wheel on the ground together */
   const W=AC.wheels,ym=W[0].p.y-W[0].r,yt=W[2].p.y-W[2].r,th=Math.atan((ym-yt)/(W[0].p.z-W[2].p.z));
   AC.spawnPitch=th;AC.spawnY=-(ym*Math.cos(th)-W[0].p.z*Math.sin(th))+0.002;}
@@ -106,6 +113,19 @@ function applyAircraftPhysics(id){const A=AIRCRAFT[id],u=upOf(id);const vec=['wh
 /* the pack a battery upgrade gives this aircraft, e.g. 4S 3000 */
 function packName(id,i){const P=Object.assign({},AC_BASE,AIRCRAFT[id].phys);return P.cells+'S '+Math.round(P.capAh*UPGRADES.battery[i].cap*10)*100;}
 function statsOf(id){const A=AIRCRAFT[id],u=upOf(id);const P=Object.assign({},AC_BASE,A.phys);const m=UPGRADES.motor[u.motor],b=UPGRADES.battery[u.battery],p=UPGRADES.prop[u.prop];
+  if(P.kind==='heli'){/* hover collective from blade-element + momentum; top speed where power required meets 90% of motor power */
+    const R=P.rotorR,A=Math.PI*R*R,OR=P.headspeed*R,r=1.18,mass=P.mass*(1+b.dm),W=mass*9.81,Pa=P.Pmax*m.T*0.9;
+    const ctH=W/(r*A*OR*OR),thH=(ctH/(P.sigma*P.cla/4*0.95)+Math.sqrt(ctH/2))*1.5;const hov=(thH*57.3-P.collMin)/(P.collMax-P.collMin);
+    const P0=v=>P.sigma*P.cd0/8*r*A*OR*OR*OR*(1+4.6*(v/OR)**2);let vmax=0;
+    /* same forces as the sim: for each speed, the forward tilt that holds height, then the rotor power that needs */
+    for(let v=1;v<80;v+=0.5){let ok=false;for(let th=0.02;th<1.2;th+=0.01){const vy=v*Math.sin(th),vz=v*Math.cos(th),Dy=0.5*r*P.CdA[1]*v*vy,Dz=0.5*r*P.CdA[2]*v*vz;
+        /* thrust needed along the disc so the vertical balance closes, then check the forward balance */
+        const T=(W+Dy*Math.cos(th)-Dz*Math.sin(th))/(Math.cos(th)-P.kH*vz*Math.sin(th));if(T<=0)continue;const fw=T*Math.sin(th)-Dy*Math.sin(th)-(P.kH*T*vz+Dz)*Math.cos(th);if(fw<0)continue;
+        let vi=Math.sqrt(T/(2*r*A));for(let k=0;k<20;k++)vi=T/(2*r*A*Math.sqrt(vz*vz+(vy+vi)*(vy+vi)));if(T*(vy+vi)*1.15+P0(vz)<=Pa){ok=true;break;}}
+      if(!ok)break;vmax=v;}
+    const thM=P.collMax/57.3;let ct=0.004;for(let k=0;k<30;k++)ct=P.sigma*P.cla/4*0.95*(2/3*thM-Math.sqrt(Math.max(ct,0)/2));
+    const Ph=W*Math.sqrt(W/(2*r*A))*1.15+P0(0),Ih=Ph/P.motorEff/(P.cells*3.8);
+    return {quad:true,vmax:vmax*3.6,vs:hov*100,climb:Math.min(ct*r*A*OR*OR,Pa/Math.sqrt(W/(2*r*A))/1.15)/W,roll:P.rateMax,endur:P.capAh*b.cap*0.75/Ih*60};}
   if(P.kind==='quad'){/* top speed: full power, tilted until thrust only just holds height; rotor and body drag balance what is left */
     const T=P.Tmax*m.T*p.T,Vp=P.Vpitch*m.Vp*p.Vp,mass=P.mass*(1+b.dm),W=mass*9.81;let vmax=0;
     /* same terms as the sim: inflow through the tilted disc, sag at full current, body drag on both axes, rotor drag.

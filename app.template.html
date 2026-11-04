@@ -51,6 +51,17 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel-2);border:1px 
 canvas.gauge{background:rgba(27,34,43,.8);border:1px solid var(--line);border-radius:4px;display:block}
 .stack{display:flex;flex-direction:column;gap:6px}
 .kvs{background:rgba(27,34,43,.8);border:1px solid var(--line);border-radius:4px;padding:5px 10px;display:grid;grid-template-columns:auto auto;gap:1px 10px;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;min-width:140px}
+.mpform{display:grid;grid-template-columns:1fr 1fr;gap:10px}.mpform label{display:grid;gap:4px;font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.mpform input{font:600 16px var(--display);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 10px;text-transform:none;letter-spacing:0}
+.mplist{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-family:var(--mono);font-size:13px}.mplist li{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0}.mplist span{color:var(--muted)}
+#mpState.ok{color:var(--good)}#mpState.no{color:var(--bad)}
+.hgcode input{font:600 15px var(--mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;width:12em;text-transform:uppercase}
+#purMarks{position:fixed;inset:0;pointer-events:none;z-index:2}
+.pm{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;font:600 12px var(--mono);letter-spacing:.04em;white-space:nowrap}
+.pm i{display:block;width:26px;height:26px;border:2px solid currentColor;border-radius:4px}
+.pm.edge i{width:0;height:0;border:none;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:16px solid currentColor;border-radius:0}
+.pm b{background:rgba(27,34,43,.78);padding:2px 6px;border-radius:3px;font-weight:600}
+.pm.w{color:#6FA8DC}.pm.w.seen{color:var(--bad)}.pm.c{color:var(--good)}.pm.c i{border-radius:50%}
 .kvs span{color:var(--muted)}.kvs b{font-weight:500;text-align:right}.kvs b.big{font-size:20px;line-height:1.1}
 #status{font-family:var(--mono);font-size:12px;color:var(--muted);background:rgba(27,34,43,.6);padding:4px 8px;border-radius:4px;width:max-content;max-width:72vw}
 #status b{color:var(--fg);font-weight:500}
@@ -225,7 +236,7 @@ body.mobile .inst .stack,body.mobile #map{display:none}
 body.mobile #adi{width:84px;height:84px}
 body.mobile #hud.minimal .inst{display:none}
 body.mobile #marshal{left:50%;transform:translateX(-50%);bottom:auto;top:max(54px,calc(env(safe-area-inset-top,0px) + 50px));padding:0;max-width:min(440px,52vw);align-items:center}
-body.mobile #marshal .m{font-size:12px;padding:3px 8px}
+body.mobile #marshal .m{font-size:12px;padding:3px 8px;background:rgba(27,34,43,.6)}
 body.mobile #marshal .m:not(:last-child){display:none}
 body.mobile #overlay.left{background:rgba(27,34,43,.5);justify-content:center}
 body.mobile #menuCard{width:min(760px,100%);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:10px 18px;align-items:start}
@@ -290,6 +301,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
         </div>
       </div>
     </div>
+    <div id="purMarks" hidden></div>
     <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
     <div id="status"><b id="sName">CraycleCub V2</b> · Kurianad Field · RWY 00 · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
@@ -304,6 +316,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <button class="btn" data-vtol hidden>Hover mode</button>
     <button class="btn" data-gear hidden>Gear down</button>
     <button class="btn" data-flap hidden>Flaps up</button>
+    <button class="btn" data-mp hidden></button>
     <button class="btn" data-tele>Telemetry: full</button>
     <button class="btn" data-sound>Sound off</button>
     <button class="btn" id="bPause">Pause</button>
@@ -328,7 +341,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.10</div>
+        <div class="sub">Flight Simulator · Kurianad strip, RWY 00 · v0.11</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -337,6 +350,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
         <button class="btn" id="bHangar">Hangar<small>The aircraft and its numbers</small></button>
         <button class="btn" id="bMenuTx">Transmitter<small>Detect, map, test</small></button>
         <button class="btn" id="bMenuField">Field and feel<small>Wind, rates, sound</small></button>
+        <button class="btn" id="bMulti">Multiplayer<small id="mpSub">Fly with friends, live</small></button>
         <button class="btn" id="bMenuLog">Logbook<small>Flights and landings</small></button>
       </div>
       <p class="kbdhelp"><kbd>←</kbd><kbd>→</kbd> ailerons · <kbd>↑</kbd><kbd>↓</kbd> elevator · <kbd>A</kbd><kbd>D</kbd> rudder · <kbd>W</kbd><kbd>S</kbd> throttle · <kbd>G</kbd> stabiliser · <kbd>C</kbd> camera · <kbd>P</kbd> pause</p>
@@ -355,6 +369,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
       <div class="ups" id="hgUps"></div>
       <details id="hgSheetWrap"><summary class="lbl">Data sheet</summary><div class="sheet" id="sheet" style="margin-top:8px"></div></details>
       <div class="hint" id="hgHint"></div>
+      <div class="row hgcode"><input id="hgCode" maxlength="20" autocomplete="off" placeholder="Code"><button class="btn mini" id="bHgCode">Apply code</button></div>
       <div class="row"><button class="btn primary" id="bHangarFly">Fly this one</button><button class="btn" id="bHangarBack">Back</button></div>
     </div>
 
@@ -399,7 +414,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
       <p>Items tick themselves as you do them. Watch the aircraft while you move each control.</p>
       <div class="check">
         <div class="ci" id="pf-tx"><span class="dot"></span><span>Controls</span><small id="pf-tx-v">keyboard</small></div>
-        <div class="ci" id="pf-thr"><span class="dot"></span><span>Throttle fully down</span><small id="pf-thr-v">0%</small></div>
+        <div class="ci" id="pf-thr"><span class="dot"></span><span>Throttle up, then fully down</span><small id="pf-thr-v">0%</small></div>
         <div class="ci" id="pf-cut" hidden><span class="dot"></span><span>Throttle cut off</span><small id="pf-cut-v">off</small></div>
         <div class="ci done"><span class="dot"></span><span>Battery 3S 2200 mAh</span><small>12.6 V</small></div>
         <div class="ci" id="pf-ail"><span class="dot"></span><span>Aileron full right</span><small>right aileron up</small></div>
@@ -451,6 +466,15 @@ body.mobile #marshal{max-width:min(420px,46vw)}
         <button class="btn" id="bPauseReset">Reset</button>
         <button class="btn" id="bPauseMenu">Main menu</button>
       </div>
+    </div>
+
+    <div class="card" id="mpCard" hidden>
+      <div class="row" style="justify-content:space-between"><h2>Multiplayer</h2><button class="btn mini" id="bMpBack">Done</button></div>
+      <p>Everyone who joins the same room code flies the Kurianad field together. Other pilots appear as their own aircraft with their callsign. They do not collide with you.</p>
+      <div class="mpform"><label>Callsign<input id="mpName" maxlength="14" autocomplete="off" placeholder="JJ"></label><label>Room code<input id="mpRoom" maxlength="16" autocomplete="off" placeholder="KURIANAD"></label></div>
+      <div class="kv"><b>Status</b><span id="mpState">Not in a room</span></div>
+      <ul class="mplist" id="mpList"></ul>
+      <div class="row"><button class="btn primary" id="bMpJoin">Join room</button><button class="btn" id="bMpFly">Fly</button></div>
     </div>
 
     <div class="card" id="logCard" hidden>
@@ -523,6 +547,7 @@ const IN={ail:0,ele:0,rud:0,thr:0,flap:0,gear:0,src:'keyboard',rawAil:0,rawEle:0
 /*__INPUT__*/
 /*__TXSETUP__*/
 /*__PURSUIT__*/
+/*__MULTI__*/
 /*__AUDIO__*/
 /*__HUD__*/
 /*__FLOW__*/
@@ -553,9 +578,9 @@ function frame(now){
     if(st.airborne&&!G.flightStart){G.flightStart=st.time;say('Airborne. Climb straight ahead to 30 m before the first turn.','good');}
     if(crash)endFlight('crash',crash);
     else{
-      if(G.mode!=='pursuit')marshal();updatePursuit(dt);
+      if(G.mode!=='pursuit')marshal();ageMarshal();updatePursuit(dt);
       if(G.mode==='gates')checkGate();
-      if(st.airborne&&st.onGround){if(st.V<0.8&&((AC.kind!=='quad'&&AC.kind!=='vtol')||IN.thr<0.05)){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
+      if(st.airborne&&st.onGround){if(st.V<0.8&&((AC.kind!=='quad'&&AC.kind!=='vtol'&&AC.kind!=='heli')||IN.thr<0.05)){G.lastGroundT+=dt;if(G.lastGroundT>1.2)endFlight('land');}else G.lastGroundT=0;
         if(st.touchdown&&!st.touchdown.said){st.touchdown.said=true;haptic(st.touchdown.sink>1.8?80:30);feedback(st.touchdown.sink>1.8?'medium':'small',st.pos.x,0.05,st.pos.z);thud(clamp(st.touchdown.sink/2.6,0.15,0.8));say('Down. Sink '+st.touchdown.sink.toFixed(1)+' m/s at '+(st.touchdown.speed*3.6).toFixed(0)+' km/h.',st.touchdown.sink>1.8?'warn':'good');}}
       if(st.onGround&&st.surf==='grass'&&st.V>4&&Math.random()<dt*8)burst(st.pos.x,0.05,st.pos.z,2,0.6,0.6);
     }
@@ -567,10 +592,10 @@ function frame(now){
   $('thrRail').style.height=Math.round(IN.rawThr*100)+'%';
   sockArm.rotation.y=-settings.wdir*Math.PI/180+Math.PI/2+Math.PI;sockArm.rotation.z=-clamp(0.9-settings.wind*0.14,0,0.9);
   placeSun(st.pos);
-  updateCamera(dt);updateMarker();updateHUD(dt);drawPursuitHud();updateAudio(dt);
+  updateMulti(dt);updateCamera(dt);updateMarker();updateHUD(dt);drawPursuitHud();updateAudio(dt);
   renderer.render(scene,camera);
 }
-window.JG={plane,THREE,AIRCRAFT,statsOf,get craft(){return craft},get loadedId(){return loadedId},get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
+window.JG={plane,THREE,AIRCRAFT,statsOf,MP,mpJoin,mpLeave,get craft(){return craft},get loadedId(){return loadedId},get surf(){return surf},renderer,AC,career,pursuit,wardens,get st(){return st},G,IN,settings,get dev(){return dev},wiz,get pad(){return {axes:padAxes,buttons:padButtons}}};
 showPad();show('menuCard');
 requestAnimationFrame(frame);
 })();

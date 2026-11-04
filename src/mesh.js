@@ -146,8 +146,47 @@ function buildQuad(spec,paint){const g=spec.geom,a=g.arm,R=g.propR,root=new THRE
   const dummy=()=>{const o=new THREE.Group();root.add(o);return o;};
   const propHub=dummy(),propDisc=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({visible:false}));root.add(propDisc);
   return {root,propHub,propDisc,steer:dummy(),legs:[],retracts:false,props,surf:{ailL:dummy(),ailR:dummy(),elev:dummy(),rudd:dummy(),flapL:dummy(),flapR:dummy()}};}
+
+/* ---------- 700 class helicopter: canopy, frame, boom, fin, skids, rotor head with two blades, tail rotor ---------- */
+const HELI_POD=[[-0.46,0.02,0.02,0.02],[-0.42,0.10,0.12,0.03],[-0.32,0.15,0.20,0.05],[-0.18,0.16,0.24,0.06],[-0.02,0.15,0.24,0.06],[0.12,0.12,0.20,0.06],[0.22,0.06,0.10,0.07],[0.26,0.03,0.04,0.08]];
+function buildHeli(spec,paint){const g=spec.geom,R=g.R,root=new THREE.Group();
+  const mP=pbr(new THREE.Color(paint.primary).getHex(),0.45),mS=pbr(new THREE.Color(paint.secondary).getHex(),0.55),mA=pbr(new THREE.Color(paint.accent).getHex(),0.5),carbon=new THREE.MeshStandardMaterial({color:0x17191c,roughness:0.45,metalness:0.25});
+  const pod=sh(new THREE.Mesh(loft(HELI_POD,24,2.4),mP));root.add(pod);
+  const win=new THREE.Mesh(new THREE.SphereGeometry(1,18,10,0,Math.PI*2,0,Math.PI/2),matGlass);win.scale.set(0.07,0.06,0.12);win.position.set(0,0.12,-0.26);win.rotation.x=-0.35;root.add(win);
+  [-1,1].forEach(sx=>{const st=new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.03),mA);st.rotation.y=sx*Math.PI/2;st.position.set(sx*0.081,0.06,-0.12);root.add(st);});
+  /* side frames behind the canopy: two carbon plates with the motor between them, not a solid box */
+  [-1,1].forEach(sx=>{const fp=sh(new THREE.Mesh(new THREE.BoxGeometry(0.004,0.17,0.3),carbon));fp.position.set(sx*0.045,0.08,0.12);root.add(fp);});
+  const mot=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.07,16),matMetal));mot.position.set(0,0.11,0.06);root.add(mot);
+  const bat=sh(new THREE.Mesh(new THREE.BoxGeometry(0.07,0.06,0.2),mS));bat.position.set(0,0.0,-0.06);root.add(bat);
+  const boom=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.022,0.9,12),mS));boom.rotation.x=Math.PI/2;boom.position.set(0,0.12,0.72);root.add(boom);
+  /* vertical fin, drawn in the side plane (z along the boom, y up) like the airplane fins */
+  const fS=new THREE.Shape();[[0,-0.06],[0.09,-0.05],[0.08,0.16],[0.02,0.13]].forEach(([z,y],i)=>i?fS.lineTo(z,y):fS.moveTo(z,y));
+  const fG=new THREE.ExtrudeGeometry(fS,{depth:0.004,bevelEnabled:false});fG.rotateY(-Math.PI/2);fG.translate(0.002,0,0);fG.computeVertexNormals();
+  const fin=sh(new THREE.Mesh(fG,mA));fin.position.set(0,0.12,1.08);root.add(fin);
+  const hs=sh(new THREE.Mesh(plateGeo([[-0.12,0],[0.12,0],[0.1,0.06],[-0.1,0.06]],0.003),mA));hs.position.set(0,0.11,0.95);root.add(hs);
+  [-1,1].forEach(sx=>{const sk=sh(new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.62,8),carbon));sk.rotation.x=Math.PI/2;sk.position.set(sx*0.13,-0.292,-0.02);root.add(sk);
+    rodTo(root,new THREE.Vector3(sx*0.04,-0.01,-0.17),new THREE.Vector3(sx*0.13,-0.29,-0.19),0.006,carbon);rodTo(root,new THREE.Vector3(sx*0.04,-0.01,0.15),new THREE.Vector3(sx*0.13,-0.29,0.17),0.006,carbon);});
+  rodTo(root,new THREE.Vector3(0,0.18,0),new THREE.Vector3(0,0.30,0),0.007,matMetal);
+  /* rotor: tilt group follows the disc (cyclic), spin group carries the head and blades */
+  const tiltG=new THREE.Group();tiltG.position.set(0,0.30,0);root.add(tiltG);const spinG=new THREE.Group();tiltG.add(spinG);
+  spinG.add(sh(new THREE.Mesh(new THREE.BoxGeometry(0.16,0.02,0.04),matMetal)));
+  const bladeM=new THREE.MeshStandardMaterial({color:new THREE.Color(paint.secondary),roughness:0.4,side:THREE.DoubleSide});const blades=[];
+  [-1,1].forEach(sx=>{const b=sh(new THREE.Mesh(new THREE.BoxGeometry(R-0.08,0.008,0.062),bladeM));b.position.set(sx*(0.08+(R-0.08)/2),0.004,0);spinG.add(b);blades.push(b);
+    const tip=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.009,0.063),mA);tip.position.set(sx*(R-0.03),0.005,0);spinG.add(tip);blades.push(tip);});
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(R,48),new THREE.MeshBasicMaterial({color:0x222428,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.rotation.x=-Math.PI/2;disc.position.y=0.004;tiltG.add(disc);
+  const trG=new THREE.Group();trG.position.set(-0.035,0.14,1.17);root.add(trG);const trBlades=[];
+  [-1,1].forEach(sy=>{const tb=new THREE.Mesh(new THREE.BoxGeometry(0.004,0.11,0.025),bladeM);tb.position.y=sy*0.058;trG.add(tb);trBlades.push(tb);});
+  const trDisc=new THREE.Mesh(new THREE.CircleGeometry(0.115,24),new THREE.MeshBasicMaterial({color:0x222428,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));trDisc.rotation.y=Math.PI/2;trG.add(trDisc);
+  const dummy=()=>{const o=new THREE.Group();root.add(o);return o;};
+  const propHub=dummy(),propDisc=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({visible:false}));root.add(propDisc);
+  return {root,propHub,propDisc,steer:dummy(),legs:[],retracts:false,heli:{tiltG,spinG,blades,disc,trG,trBlades,trDisc},surf:{ailL:dummy(),ailR:dummy(),elev:dummy(),rudd:dummy(),flapL:dummy(),flapR:dummy()}};}
 const THROW={ail:0.45,ele:0.38,rud:0.5};
 function animateCraft(c,inp,gp){
+  if(c.heli){/* rotor turns clockwise from above; past a third of headspeed the blades blur; the disc tilts with the cyclic */
+    const H=c.heli,W=(typeof st!=='undefined'&&st.rotorW)||0,f=W/(AC.headspeed||220);H.spinG.rotation.y-=Math.min(W*0.016,1.1);
+    H.blades.forEach(b=>b.visible=f<0.35);H.disc.material.opacity=clamp((f-0.2)*0.8,0,0.42);
+    if(st.disc){H.tiltG.rotation.x=-st.disc.z;H.tiltG.rotation.z=-st.disc.x;}
+    H.trG.rotation.x+=Math.min(W*0.08,1.3);H.trBlades.forEach(b=>b.visible=f<0.35);H.trDisc.material.opacity=clamp((f-0.2)*0.8,0,0.4);return;}
   const spinProps=list=>list.forEach((P,i)=>{const m=(typeof st!=='undefined'&&st.motor)?st.motor[i]:0;P.g.rotation.y+=P.dir*(m*4.2+(m>0.01?0.6:0));P.blades.forEach(b=>b.visible=m<0.35);P.disc.material.opacity=clamp((m-0.2)*0.9,0,0.38);});
   /* props spin with each motor's own speed; past a third of full speed the blades blur into a disc */
   if(c.props){spinProps(c.props);return;}
@@ -159,6 +198,6 @@ function animateCraft(c,inp,gp){
 const plane=new THREE.Group();scene.add(plane);
 let craft=null,surf=null,propHub=null,propDisc=null,loadedId=null;
 function disposeTree(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();m.dispose();});}});}
-function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=AIRCRAFT[id].kind==='quad'?buildQuad(AIRCRAFT[id],paintOf(id)):buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);if(typeof applyStabLabel==='function')applyStabLabel();plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
+function loadPlayerAircraft(id){loadedId=id;applyAircraftPhysics(id);const sn=document.getElementById('sName');if(sn)sn.textContent=AIRCRAFT[id].name;if(typeof syncFeatureButtons==='function')syncFeatureButtons();if(craft){plane.remove(craft.root);disposeTree(craft.root);}craft=AIRCRAFT[id].kind==='heli'?buildHeli(AIRCRAFT[id],paintOf(id)):AIRCRAFT[id].kind==='quad'?buildQuad(AIRCRAFT[id],paintOf(id)):buildAircraft(AIRCRAFT[id],paintOf(id),AC.wheels);if(typeof applyStabLabel==='function')applyStabLabel();plane.add(craft.root);surf=craft.surf;propHub=craft.propHub;propDisc=craft.propDisc;st=Sim.create();}
 function animateSurfaces(IN){animateCraft(craft,IN,st.gearPos);}
 loadPlayerAircraft(career.selected);

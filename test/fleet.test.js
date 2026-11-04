@@ -6,7 +6,7 @@ const M=new Function('THREE','AC','Sim','store','num','clamp',src+';return {AIRC
 const V=(x,y,z)=>new THREE.Vector3(x,y,z);const env={wind:V(0,0,0),rho:1.18,surfaceAt:()=>'strip'};const DT=1/240;
 function att(st){const f=V(0,0,-1).applyQuaternion(st.q),up=V(0,1,0).applyQuaternion(st.q),rt=V(1,0,0).applyQuaternion(st.q);return {pitch:Math.asin(clamp(f.y,-1,1))*57.3,roll:Math.atan2(rt.y,up.y)*57.3,hdg:(Math.atan2(f.x,-f.z)*57.3+360)%360};}
 function air(st,y,v,thr,q){st.pos.set(0,y,0);st.q.copy(q||new THREE.Quaternion());st.vel.set(0,0,-v).applyQuaternion(st.q);st.airborne=true;st.onGround=false;st.thr=thr;st.time=1;st.gearPos=AC.features.gear?1:0;}
-const ids=process.argv[2]?process.argv[2].split(','):Object.keys(M.AIRCRAFT).filter(k=>!['quad','vtol'].includes(M.AIRCRAFT[k].kind));const out={};
+const ids=process.argv[2]?process.argv[2].split(','):Object.keys(M.AIRCRAFT).filter(k=>!['quad','vtol','heli'].includes(M.AIRCRAFT[k].kind));const out={};
 for(const id of ids){M.applyAircraftPhysics(id);const S=M.statsOf(id);const vs=S.vs/3.6;const r={stats:{vmax:+S.vmax.toFixed(0),vs:+S.vs.toFixed(0),tw:+S.climb.toFixed(2),roll:+S.roll.toFixed(0),endur:+S.endur.toFixed(1)}};
   // 0. sits on its wheels
   let st=Sim.create();let c=null;for(let t=0;t<2;t+=DT){c=Sim.step(st,{ail:0,ele:0,rud:0,thr:0},DT,env);if(c)break;}r.rest={crash:c,pitch:+att(st).pitch.toFixed(1),y:+st.pos.y.toFixed(3),bounce:+st.vel.length().toFixed(3)};

@@ -1,7 +1,7 @@
 {
   "name": "JG RoveaRange: Flight Simulator",
   "short_name": "RoveaRange",
-  "description": "Jinu's Garage RC flight simulator: six planes, a VTOL and an FPV quad, career pursuits and real transmitter support on the Kurianad strip.",
+  "description": "Jinu's Garage RC flight simulator: six planes, a VTOL, a helicopter and an FPV quad, multiplayer rooms, career pursuits and real transmitter support on the Kurianad strip.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

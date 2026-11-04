@@ -127,3 +127,18 @@ Scores after v0.5 (self-audit): transmitter 97, flight model 93, phone controls 
 - Battery: false "Land now" alarms found on fresh 6S packs. Pack resistance now per aircraft (6S 6000: 3 mOhm, 6S 3300: 4 mOhm); quad alarm at 3.4 V per cell, as FPV pilots set it, because a 6S racing pack sags to about 3.5 V on a full punch. New test/battery.test.js checks every aircraft at full power on a fresh pack.
 - Tests: test/vtol.test.js (rest, vertical take-off and hover, transition, cruise, back-transition, vertical landing, hover current); npm test runs fleet, quad, VTOL and battery tests; browser regressions pass.
 - Next: Rotor R-20, collective-pitch helicopter (the hardest flight model: rotor head, tail rotor, governor, autorotation).
+
+## v0.11 (4 Nov 2026): Rotor R-20 helicopter, multiplayer, pilot view, career guidance
+
+- Rotor R-20, 700 class collective-pitch helicopter (sim.js stepHeli): blade-element thrust with momentum inflow (translational lift), induced and profile power, rotor inertia, governor with soft start against a 5 kW limit, heading-hold tail rotor geared to the main rotor, cyclic disc tilt with flapping lag and flapback, flybarless controller (Acro, Horizon, Angle with the one-skid-low trim against tail-rotor thrust), skid contacts, blade strike, hard landing.
+  - Measured: spool-up 4.8 s, hover at 47% stick (2.4 deg collective, 1.06 kW, 22 A), drift 6 m in 8 s hands-off in Angle, roll 325 deg/s, yaw 513 deg/s, level top speed 114 km/h (hangar 126).
+  - Autorotation: throttle hold (H key or the cut switch) at 60 m, collective -4 deg holds 1,640 rpm in a 9.4 m/s descent; a metered flare lands at 2.4 m/s using the rotor energy (808 rpm at touchdown). Leaving collective up after a power cut decays headspeed to 70% in 1 s and it falls.
+  - Corrections during tuning: missing rate-curve constant (NaN), blade drag 0.011 to 0.009, hub stiffness and rotor damping, flapback 0.004 to 0.0015, fuselage top drag area 0.25 to 0.18 m2, hangar top speed now uses the same forces as the sim.
+- Multiplayer (src/multi.js): Supabase Realtime in the jinus-garage-ops project (free plan allows two active projects, both in use). Room codes; presence for callsign, aircraft and paint; broadcast of position, attitude, velocity and rotor or motor state at 5 Hz on wall-clock time; ghosts drawn 0.25 s in the past and interpolated; callsign tags; blue dots on the map. No tables used. Tested with two browsers through Supabase: join, see each other, live positions, leave.
+  - Bug found: send timing used capped frame time, so slow devices sent every few seconds. Fixed.
+  - Free-plan limits: 200 concurrent connections and 2 million Realtime messages a month, roughly 8 to 9 hours of 4-pilot flying a month at 5 Hz.
+- Pilot view on phone: the camera stood inside the pilot figure (now hidden in pilot view), the windsock stood in the low-pass sight line (moved 37 m out to the right of the strip), marshal messages fade after 6 s on phone and 12 s on desktop with a lighter box.
+- Preflight throttle check is active: raise the throttle, then back to idle (it was green by default).
+- Career guidance: on-screen markers for each Warden (blue, red when it sees you, with distance; edge arrows when off-screen), a green COVER marker at the nearest spot behind a tree or hill the Warden cannot see through (same line-of-sight test the Wardens use), and a status line (SEEN at N m / HIDDEN). Chapter 1 brief explains them.
+- Hangar code ROVEARANGE adds 1,000,000 credits for testing. Text boxes release keyboard focus when the screen changes (a focused box swallowed the flight keys).
+- Tests: test/heli.test.js added to npm test (fleet, quad, VTOL, helicopter, battery all pass); browser regressions pass.

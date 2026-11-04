@@ -197,3 +197,9 @@ Feedback: the game showed a crash while JJ was still flying, mostly at long dist
   - the 450 m visual line-of-sight ring, the radio range and a 1 km scale.
   - On phones in landscape, the map and its legend sit side by side.
 - The 450 m line-of-sight call is unchanged. It records a rule violation, as in real flying, but does not end the flight.
+
+## v0.14.1 (4 Nov 2026): map screen could not be closed on phones
+- Cause: the map overlay sat inside the game layer, so on phones the 3D view captured the taps meant for Close. It was reproduced on the live v0.14 at phone size.
+- Fix:
+  - The overlay is now a top-level layer above everything.
+  - Close, a tap on the dark area around the map, the Map button again, or Esc or M on a keyboard all close it, and the flight resumes.

@@ -57,7 +57,7 @@ canvas.gauge{background:rgba(27,34,43,.8);border:1px solid var(--line);border-ra
 #mpState.ok{color:var(--good)}#mpState.no{color:var(--bad)}
 .hgcode input{font:600 15px var(--mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;width:12em;text-transform:uppercase}
 #purMarks{position:fixed;inset:0;pointer-events:none;z-index:2}
-#bigMap{position:fixed;inset:0;z-index:40;background:rgba(14,18,23,.88);display:flex;align-items:center;justify-content:center;padding:12px}
+#bigMap{position:fixed;inset:0;z-index:100;background:rgba(14,18,23,.88);display:flex;align-items:center;justify-content:center;padding:12px}
 #bigMap[hidden]{display:none}
 #bigMap .bm{display:flex;flex-direction:column;gap:8px;width:min(94vw,calc(86vh - 60px));max-width:900px}
 #bigMap .bmHead{display:flex;align-items:center;gap:12px;color:#F7F4EE;font:600 15px Rajdhani,sans-serif}
@@ -317,7 +317,6 @@ body.mobile #marshal{max-width:min(420px,46vw)}
       </div>
     </div>
     <div id="purMarks" hidden></div>
-    <div id="bigMap" hidden><div class="bm"><div class="bmHead"><b id="bmTitle">Map</b><span id="bmInfo"></span><button class="btn" id="bmClose">Close</button></div><canvas id="bmC" width="1024" height="1024"></canvas><div class="bmKey"><i class="k-road"></i>Roads <i class="k-water"></i>Water <i class="k-bld"></i>Buildings <i class="k-field"></i>Field <i class="k-me"></i>You <i class="k-range"></i>Radio range</div></div></div>
     <div id="purHud" hidden><span class="heat" id="purHeat">★☆☆</span><span class="pb"><span class="lbl">Bust</span><span class="bar bust"><i id="purBust"></i></span></span><span class="pb"><span class="lbl">Cooldown</span><span class="bar cool"><i id="purCool"></i></span></span><span class="lbl">Bounty <b id="purB">0</b></span><span class="goal" id="purGoal"></span></div>
     <div id="gatebox"><span>GATE <span class="n" id="gNum">1</span>/<span id="gTot">6</span></span><span id="gTime">0.00s</span><span id="gBest" style="color:var(--muted)"></span></div>
     <div id="status"><b id="sName">CraycleCub V2</b> · <span id="sField">Kurianad</span> · RWY 00 · <span id="sZone">Green 120 m</span> · <span id="sInput">keyboard</span> · <span id="sRate">high rate</span> · <span id="sFps">60 fps</span></div>
@@ -359,7 +358,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
     <div class="card" id="menuCard">
       <div class="menuhead">
         <h1>JG <span>RoveaRange</span></h1>
-        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.14</div>
+        <div class="sub">Flight Simulator · <span id="sSite">Kurianad, Kottayam</span> · v0.14.1</div>
       </div>
       <div class="kv"><b>Transmitter</b><span id="txState" class="no">none</span><b>Credits</b><span id="menuCredits">0</span></div>
       <div class="menu">
@@ -536,6 +535,7 @@ body.mobile #marshal{max-width:min(420px,46vw)}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<div id="bigMap" hidden><div class="bm"><div class="bmHead"><b id="bmTitle">Map</b><span id="bmInfo"></span><button class="btn" id="bmClose">Close</button></div><canvas id="bmC" width="1024" height="1024"></canvas><div class="bmKey"><i class="k-road"></i>Roads <i class="k-water"></i>Water <i class="k-bld"></i>Buildings <i class="k-field"></i>Field <i class="k-me"></i>You <i class="k-range"></i>Radio range</div></div></div>
 <script>
 (function(){
 'use strict';
